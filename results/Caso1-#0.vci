@@ -1,0 +1,41 @@
+file 63215 1780364923                                           
+version 3
+run Caso1-0-20260601-22:48:32-951856
+attr configname Caso1
+attr datetime 20260601-22:48:32
+attr datetimef 20260601-224832
+attr experiment Caso1
+attr inifile omnetpp.ini
+attr iterationvars ""
+attr iterationvarsd ""
+attr iterationvarsf ""
+attr measurement ""
+attr network Network
+attr processid 951856
+attr repetition 0
+attr replication #0
+attr resultdir results
+attr runnumber 0
+attr seedset 0
+config network Network
+config sim-time-limit 200s
+config Network.node[0].app.interArrivalTime exponential(1)
+config Network.node[0].app.packetByteSize 125000
+config Network.node[0].app.destination 5
+config Network.node[2].app.interArrivalTime exponential(1)
+config Network.node[2].app.packetByteSize 125000
+config Network.node[2].app.destination 5
+
+vector 0 Network.node[0].lnk[0] "Buffer Size" ETV
+vector 1 Network.node[2].lnk[0] "Buffer Size" ETV
+vector 2 Network.node[7].lnk[0] "Buffer Size" ETV
+vector 3 Network.node[1].lnk[0] "Buffer Size" ETV
+vector 4 Network.node[6].lnk[0] "Buffer Size" ETV
+vector 5 Network.node[5].app Delay ETV
+0	1041 15594 3 5612 0.898560388484 199.773328855839 586 0 190 54451 6821233
+1	16635 9502 10 5607 1.859604212075 199.64888529358 377 0 10 1241 6461
+2	26137 10002 15 5617 1.898660388484 199.773428855839 396 0 1 198 198
+3	36139 9462 23 5611 2.859704212075 199.64898529358 374 0 1 187 187
+4	45601 9960 33 5622 2.898760388484 199.773528855839 394 0 1 197 197
+5	55561 7653 56 5625 3.898860388484 199.773628855839 196 3.0003 105.5643977967 10027.195182068 670009.47889675
+
