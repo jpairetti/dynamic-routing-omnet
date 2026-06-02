@@ -1,0 +1,373 @@
+% =============================================================================
+% Plantilla de POSTER — Laboratorio 4: Capa de Red (OMNeT++)
+% Cátedra de Redes y Sistemas Distribuidos — FaMAF/UNC
+%
+% Tamaño: A0 vertical (84,1 cm × 118,9 cm) — dos columnas.
+% Logos: figuras/logos/unc-escudo-famaf.png, figuras/logos/logo-famaf.png
+%
+% Compilación (desde esta carpeta):
+%   pdflatex lab4-poster.tex
+%   pdflatex lab4-poster.tex   % segunda pasada recomendada
+%
+% Requiere la carpeta figuras/logos/ con los archivos indicados abajo.
+% =============================================================================
+
+\documentclass[final]{beamer}
+
+\usepackage[size=a0,orientation=portrait,scale=1.14]{beamerposter}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{amsmath}
+\usepackage{tikz}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+\pgfplotsset{
+  every axis/.append style={
+    tick label style={font=\large},
+    label style={font=\Large},
+    title style={font=\Large},
+    legend style={font=\large},
+  }
+}
+\usetikzlibrary{arrows.meta,calc,positioning,shapes.geometric}
+
+% --- Datos del grupo ------------------------------------------------------------
+\newcommand{\TituloPoster}{Routing Strategies for Ring and General Topologies in}
+\newcommand{\TituloPosterLinea}{OMNeT++}
+
+\newcommand{\IntegrantesPoster}{Apellido, Nombre \and Apellido, Nombre \and Apellido, Nombre \and Apellido, Nombre}
+\newcommand{\GrupoPoster}{Grupo XX}
+
+% --- Logos (descargados de unc.edu.ar y famaf.unc.edu.ar) -----------------------
+% Logos: unc-escudo-famaf.png = escudo UNC con fondo #064F63 (encabezado)
+\newcommand{\LogoUNC}{figuras/logos/unc-escudo-famaf.png}
+\newcommand{\LogoFAMAF}{figuras/logos/logo-famaf.png}
+
+% --- Paleta (armonizada con logo FaMAF #0B8BAB) ---------------------------------
+\definecolor{FamafPrimary}{HTML}{0B8BAB}   % color del logo
+\definecolor{FamafDark}{HTML}{064F63}      % encabezado y pie
+\definecolor{FamafMedium}{HTML}{087A96}    % variantes en gráficos
+\definecolor{FamafLight}{HTML}{E8F5F9}     % fondos de bloques
+\definecolor{FamafAccent}{HTML}{E8A838}    % acento cálido (alertas, año)
+\definecolor{TextDark}{HTML}{2C3E50}
+\definecolor{GuideBg}{HTML}{D6EEF5}        % cajas guía
+
+\title{\TituloPoster\\[0.4cm]\TituloPosterLinea}
+\author{\IntegrantesPoster}
+
+\newcommand{\guia}[1]{%
+  \par\vspace{0.3em}%
+  {\normalsize
+  \colorbox{GuideBg}{\parbox{0.97\linewidth}{\textcolor{FamafDark}{\textbf{Guía:}}~#1}}%
+  }%
+  \par\vspace{0.3em}%
+}
+
+% --- Estilo beamer --------------------------------------------------------------
+\usetheme{default}
+\setbeamercolor{headline}{bg=FamafDark,fg=white}
+\setbeamercolor{author in head/foot}{bg=FamafDark,fg=white}
+\setbeamercolor{block title}{bg=FamafPrimary,fg=white}
+\setbeamercolor{block body}{bg=FamafLight,fg=TextDark}
+\setbeamercolor{item}{fg=FamafPrimary}
+\setbeamercolor{block alerted title}{bg=FamafAccent,fg=white}
+\setbeamercolor{block alerted body}{bg=FamafLight,fg=TextDark}
+
+\setbeamerfont{title}{size=\VeryHuge,series=\bfseries}
+\setbeamerfont{author}{size=\Large}
+\setbeamerfont{block title}{size=\LARGE,series=\bfseries}
+\setbeamerfont{block alerted title}{size=\LARGE,series=\bfseries}
+\setbeamerfont{block body}{size=\large}
+\setbeamerfont{itemize/enumerate body}{size=\large}
+
+% Encabezado (compatible con una sola compilación)
+\setbeamertemplate{headline}{%
+  \begin{beamercolorbox}[wd=\paperwidth,leftskip=1.6cm,rightskip=1.4cm,sep=0.65cm]{headline}
+    \begin{columns}[T,totalwidth=\textwidth]
+      \begin{column}{0.13\textwidth}
+        \centering
+        \includegraphics[height=4.6cm,keepaspectratio]{\LogoUNC}
+      \end{column}
+      \begin{column}{0.70\textwidth}
+        \centering
+        {\fontsize{44}{52}\selectfont\bfseries \TituloPoster\par}
+        \vspace{0.2cm}
+        {\fontsize{52}{58}\selectfont\bfseries\textcolor{FamafPrimary}{\TituloPosterLinea}\par}
+        \vspace{0.35cm}
+        {\LARGE\textbf{Laboratorio 4 — Capa de Red}\par}
+        \vspace{0.55cm}
+        {\Large\insertauthor\par}
+        \vspace{0.25cm}
+        {\large\textcolor{white!92}{\GrupoPoster \ $\bullet$ \ FaMAF/UNC}\par}
+      \end{column}
+      \begin{column}{0.13\textwidth}
+        \centering
+        \includegraphics[height=4.3cm,keepaspectratio]{\LogoFAMAF}
+      \end{column}
+    \end{columns}
+  \end{beamercolorbox}
+}
+
+% Pie de página
+\setbeamertemplate{footline}{%
+  \begin{beamercolorbox}[wd=\paperwidth,leftskip=2.5cm,rightskip=2.5cm,sep=0.85cm,dp=1.2ex]{author in head/foot}
+    \begin{columns}[T,totalwidth=\textwidth]
+      \begin{column}{0.62\textwidth}
+        \Large\textbf{Defensa en clase:} objetivos, evidencia, algoritmo, mejoras cuantificadas y conclusiones.
+      \end{column}
+      \begin{column}{0.36\textwidth}
+        \raggedleft\Large
+        \textcolor{FamafPrimary}{\textbf{FaMAF/UNC}} — Redes y Sist.\ Distribuidos\\
+        \textcolor{FamafAccent}{\textbf{2026}}
+      \end{column}
+    \end{columns}
+  \end{beamercolorbox}
+}
+
+\setbeamertemplate{navigation symbols}{}
+
+\newcommand{\RingTopology}{%
+  \begin{tikzpicture}[
+    ring node/.style={
+      circle, draw=FamafPrimary, thick, fill=white,
+      minimum size=10mm, inner sep=0pt,
+      font=\normalsize\bfseries
+    },
+    fwd link/.style={
+      ->, >=Stealth, thick, draw=FamafDark!85!black,
+      shorten >=2mm, shorten <=2mm
+    },
+  ]
+    \def\radius{1.7}
+    \foreach \i in {0,...,7} {
+      \pgfmathsetmacro{\nodeangle}{90 - 45*\i}
+      \node[ring node] (n\i) at (\nodeangle:\radius) {\i};
+    }
+    \draw[gray!35, dashed, line width=0.5pt] (0,0) circle (\radius);
+    \foreach \i/\j in {0/1,1/2,2/3,3/4,4/5,5/6,6/7,7/0} {
+      \draw[fwd link] (n\i) -- (n\j);
+    }
+  \end{tikzpicture}
+}
+
+\begin{document}
+\begin{frame}[t]
+
+\begin{columns}[T,totalwidth=\paperwidth]
+
+% =============================================================================
+% COLUMNA IZQUIERDA — contexto, modelo y análisis
+% =============================================================================
+\begin{column}{0.46\paperwidth}
+  \hspace{2cm}
+
+  \begin{block}{Motivación y objetivos}
+    \guia{3--4 viñetas breves: problema, baseline, objetivo y herramienta.}
+    \begin{itemize}
+      \item \textbf{Problema:} enrutamiento en capa de red con múltiples interfaces en anillo.
+      \item \textbf{Baseline:} kickstarter usa siempre \texttt{toLnk[0]} (sentido horario).
+      \item \textbf{Objetivo:} analizar, diseñar estrategia mejor y comparar con datos.
+      \item \textbf{Herramienta:} OMNeT++ — 8 nodos, tráfico configurable.
+    \end{itemize}
+  \end{block}
+
+  \vspace{0.45cm}
+
+  \begin{alertblock}{Mensaje clave}
+    \guia{Una frase para abrir la defensa oral.}
+    \textit{[``Nuestro algoritmo reduce la demora media en X\% respecto al kickstarter.'']}
+  \end{alertblock}
+
+  \vspace{0.45cm}
+
+  \begin{block}{Modelo de simulación}
+    \guia{Diagrama + parámetros del \texttt{omnetpp.ini}. Reutilice figuras del paper.}
+    \centering
+    \RingTopology\\[0.3cm]
+    {\Large Topología en anillo — 8 nodos}
+    \vspace{0.35cm}
+    \raggedright
+    \textbf{Capas:} \texttt{app} $\rightarrow$ \texttt{net} $\rightarrow$ \texttt{lnk[0,1]}\\
+    \textbf{Métricas:} demora E2E, saltos, buffers, utilización de enlaces.
+  \end{block}
+
+  \vspace{0.45cm}
+
+  \begin{block}{Análisis — Caso 1}
+    \guia{\texttt{node[0]} y \texttt{node[2]} $\rightarrow$ \texttt{node[5]}. Gráfico, leyenda y tabla bien separados.}
+    \textbf{Fuentes:} \texttt{node[0]} y \texttt{node[2]} $\rightarrow$ \texttt{node[5]}
+
+    \vspace{0.5cm}
+    \centering
+    \begin{tikzpicture}
+      \begin{axis}[
+        width=0.9\linewidth,
+        height=5.5cm,
+        ybar,
+        bar width=12pt,
+        ymin=0,
+        enlarge x limits=0.12,
+        symbolic x coords={Demora,Saltos,Buffer,Enlace},
+        xtick=data,
+        ylabel={Valor norm.},
+        title={Caso 1 — baseline kickstarter},
+        legend to name=legCaso1,
+        legend style={draw=FamafPrimary!40, fill=white, font=\large},
+      ]
+        \addplot[fill=FamafDark!75] coordinates {(Demora,0.42) (Saltos,0.55) (Buffer,0.31) (Enlace,0.48)};
+        \addplot[fill=FamafPrimary!80] coordinates {(Demora,0.35) (Saltos,0.50) (Buffer,0.28) (Enlace,0.40)};
+        \legend{node[0], node[2]}
+      \end{axis}
+    \end{tikzpicture}
+
+    \vspace{0.35cm}
+    \pgfplotslegendfromname{legCaso1}
+
+    \vspace{0.85cm}
+    \large
+    \renewcommand{\arraystretch}{1.2}
+    \begin{tabular}{@{}lrr@{}}
+      \toprule
+      \textbf{Métrica} & \textbf{Prom.} & \textbf{Máx.} \\
+      \midrule
+      Demora (s) & 0.00 & 0.00 \\
+      Saltos     & 0.0  & 0    \\
+      Buffer     & 0.0  & 0    \\
+      Enlace (\%)& 0.0  & 0.0  \\
+      \bottomrule
+    \end{tabular}
+  \end{block}
+
+  \vspace{0.45cm}
+
+  \begin{block}{Análisis — Caso 2}
+    \guia{7 fuentes $\rightarrow$ \texttt{node[5]}. Marque umbral de estabilidad.}
+
+    \vspace{0.4cm}
+    \centering
+    \begin{tikzpicture}
+      \begin{axis}[
+        width=0.9\linewidth,
+        height=5.8cm,
+        xlabel={\texttt{interArrivalTime} (s)},
+        ylabel={Demora media (s)},
+        xmin=0, xmax=10,
+        xtick={0,2,4,6,8,10},
+        ymin=0,
+        grid=major,
+        title={Estabilidad vs.\ carga ofrecida},
+        legend to name=legCaso2,
+        legend style={draw=FamafPrimary!40, fill=white, font=\large},
+      ]
+        \addplot[thick, FamafPrimary, mark=*, mark size=3pt] coordinates {
+          (0.5,2.8)(1,1.9)(2,1.1)(3,0.7)(5,0.48)(8,0.43)
+        };
+        \addlegendentry{Demora E2E}
+        \addplot[thick, FamafAccent, dashed] coordinates {(0,1.5)(10,1.5)};
+        \addlegendentry{Umbral (ej.)}
+      \end{axis}
+    \end{tikzpicture}
+
+    \vspace{0.35cm}
+    \pgfplotslegendfromname{legCaso2}
+
+    \vspace{0.75cm}
+    \raggedright
+    \textbf{Umbral:} \textit{interArrivalTime $\geq$ ?? s} — \textit{[justificación]}.
+  \end{block}
+
+\end{column}
+
+% =============================================================================
+% COLUMNA DERECHA — diseño, evaluación y conclusiones
+% =============================================================================
+\begin{column}{0.46\paperwidth}
+
+  \begin{block}{Algoritmo propuesto}
+    \guia{Información local, mensajes hello/echo, regla de decisión. Sin \texttt{cTopology}.}
+    \begin{itemize}
+      \item Tablas locales de rutas / costos por destino
+      \item Mensajes \texttt{hello}/\texttt{echo} para descubrir vecinos
+      \item Interfaz de salida según \textit{[criterio: saltos, carga, etc.]}
+    \end{itemize}
+    \vspace{0.3cm}
+    {\Large\ttfamily
+    al recibir paquete p:\\[0.12cm]
+    \quad si dest(p) == local: entregar a app\\[0.12cm]
+    \quad sino: reenviar por interfaz j
+    }
+    \vspace{0.3cm}
+    \textbf{Tarea estrella (opc.):} topología \texttt{networkStar}, $N$ interfaces.
+  \end{block}
+
+  \vspace{0.45cm}
+
+  \begin{block}{Evaluación comparativa}
+    \guia{Baseline vs.\ propuesto. Mejoras en \%. ¿Hubo bucles?}
+
+    \vspace{0.4cm}
+    \centering
+    \begin{tikzpicture}
+      \begin{axis}[
+        width=0.9\linewidth,
+        height=5.8cm,
+        ybar,
+        bar width=14pt,
+        ymin=0,
+        enlarge x limits=0.12,
+        symbolic x coords={C1-Dem,C1-Sal,C2-Dem,C2-Buf},
+        xtick=data,
+        x tick label style={rotate=12,anchor=east},
+        ylabel={Valor},
+        title={Baseline vs.\ algoritmo propuesto},
+        legend to name=legComp,
+        legend style={draw=FamafPrimary!40, fill=white, font=\large},
+      ]
+        \addplot[fill=FamafDark!75] coordinates {(C1-Dem,0.72) (C1-Sal,4.0) (C2-Dem,1.85) (C2-Buf,0.65)};
+        \addplot[fill=FamafPrimary!80] coordinates {(C1-Dem,0.41) (C1-Sal,2.0) (C2-Dem,0.92) (C2-Buf,0.28)};
+        \legend{Kickstarter, Propuesto}
+      \end{axis}
+    \end{tikzpicture}
+
+    \vspace{0.35cm}
+    \pgfplotslegendfromname{legComp}
+
+    \vspace{0.75cm}
+    \begin{columns}[T,totalwidth=\linewidth]
+      \begin{column}{0.48\linewidth}
+        \textbf{Mejoras (ej.):}
+        \begin{itemize}
+          \item Demora C1: \textbf{$-43\%$}
+          \item Saltos C1: \textbf{$-50\%$}
+        \end{itemize}
+      \end{column}
+      \begin{column}{0.48\linewidth}
+        \begin{itemize}
+          \item Demora C2: \textbf{$-50\%$}
+          \item Buffer C2: \textbf{$-80\%$}
+        \end{itemize}
+      \end{column}
+    \end{columns}
+    \vspace{0.2cm}
+    \textbf{Bucles de enrutamiento:} \textit{[Sí / No — explique]}
+  \end{block}
+
+  \vspace{0.45cm}
+
+  \begin{alertblock}{Conclusiones}
+    \guia{3 viñetas con datos concretos de sus experimentos.}
+    \begin{itemize}
+      \item El baseline concentra tráfico en un sentido $\Rightarrow$ \textit{[hallazgo cuantificado]}.
+      \item Nuestro algoritmo mejora \textit{[métrica]} en \textit{[X\%]} porque \textit{[razón]}.
+      \item Trabajo futuro: \textit{[generalización, otras topologías]}.
+    \end{itemize}
+  \end{alertblock}
+
+\end{column}
+
+\end{columns}
+
+\end{frame}
+\end{document}
