@@ -41,7 +41,7 @@
       \textbf{\textcolor{blue!60!black}{Guía para completar:}}~#1
     }%
   }%
-  \smallskip\par
+    \smallskip\par
 }
 
 % Tablas que deben caber dentro de una columna (formato 2 columnas)
@@ -53,8 +53,8 @@
 
 % Datos del grupo — modifique estos campos
 \newcommand{\Titulo}{Routing Strategies for Ring and General Topologies in OMNeT++}
-\newcommand{\Grupo}{Grupo XX}
-\newcommand{\Integrantes}{Apellido, Nombre; Apellido, Nombre; Apellido, Nombre; Apellido, Nombre}
+\newcommand{\Grupo}{Grupo 31}
+\newcommand{\Integrantes}{Bosque, Lissandro; Galassi, Franco; Pairetti, Joaquín}
 \renewcommand{\refname}{Referencias}
 \renewcommand{\abstractname}{Abstract}
 \renewcommand{\appendixname}{Ap\'{e}ndice}
@@ -103,29 +103,65 @@
 \section{Introducción}
 \label{sec:intro}
 
-\guia{%
-  Presente el problema del laboratorio: enrutamiento en una capa de red con
-  múltiples entradas y salidas. Explique brevemente el modelo en anillo del
-  kickstarter, sus limitaciones (p.\,ej.\ siempre usa \texttt{toLnk[0]}) y el
-  objetivo de su trabajo: analizar el baseline, diseñar una estrategia mejor
-  y evaluarla con datos. Cierre con una frase que anticipe las conclusiones
-  principales. Extensión sugerida: 1 columna (medio párrafo denso).
-}
+%\guia{%
+%  Presente el problema del laboratorio: enrutamiento en una capa de red con
+%  múltiples entradas y salidas. Explique brevemente el modelo en anillo del
+%  kickstarter, sus limitaciones (p.\,ej.\ siempre usa \texttt{toLnk[0]}) y el
+%  objetivo de su trabajo: analizar el baseline, diseñar una estrategia mejor
+%  y evaluarla con datos. Cierre con una frase que anticipe las conclusiones
+%  principales. Extensión sugerida: 1 columna (medio párrafo denso).
+%}
 
 Este artículo reporta el análisis y diseño de estrategias de enrutamiento
-implementadas sobre el modelo de red del Laboratorio~4. \textit{[Reemplace este
-párrafo con su introducción: contexto, motivación, objetivos específicos del
-grupo y organización del paper (Secciones~\ref{sec:modelo}--\ref{sec:conclusiones}).]}
+implementadas sobre el modelo de red del Laboratorio~4. Fue desarrollado por el grupo de forma tal que se priorizó la discusión total
+de su contenido, para luego dividir los temas y que cada integrante redacte un texto base para luego
+compartirlo a los demás. Por último, se hizo una revisión y corrección de errores.
 
-\textit{[Segundo párrafo sugerido: describa la limitación del algoritmo baseline
-(envío fijo por \texttt{toLnk[0]}), el impacto en demora y utilización de
-enlaces, y el criterio con el que evaluarán si una estrategia es ``mejor''
-(p.\,ej.\ menor demora media, menor variabilidad, ausencia de bucles, mayor
-throughput sostenible).]}
+A través de un \textit{kickstarter}, provisto por la cátedra de Redes 2026, nos fue dada una implementación base
+de un modelo de red de 8 nodos conectados en forma de anillo 
+con el objetivo de que la misma fuera analizada en OMNeT++ para lograr 
+una mejor comprensión del tráfico de red en el modelo base con unas métricas iniciales
+y así plantear una forma más óptima de enviar los paquetes
+implementando cambios en el modelo para lograr el enrutamiento deseado. 
+En el \textit{kickstarter} , con el enrutamiento inicial todos los paquetes son enviados en 
+sentido horario a partir de \texttt{toLnk[0]} hasta llegar a su destino, 
+ignorando si se tarda más que enviarlo en sentido antihorario. 
+Por ejemplo, si se tuviése un paquete en el nodo cero, y se quisiera enviarlo hasta el 5, con el modelo inicial
+se recorrerían 5 nodos. En cambio, si se hiciera con el modelo modificado, se compararía su distancia con el sentido antihorario, 
+el cuál resultaría más eficiente, ya que recorrería 3 nodos.
 
-\textit{[Tercer párrafo sugerido: resuma en 2--3 oraciones qué algoritmo
-propusieron y cuál fue la mejora principal observada, sin entrar aún en detalle
-técnico.]}
+
+%\textit{[Reemplace este
+%párrafo con su introducción: contexto, motivación, objetivos específicos del
+%grupo y organización del paper (Secciones~\ref{sec:modelo}--\ref{sec:conclusiones}).]}
+
+%\textit{[Segundo párrafo sugerido: describa la limitación del algoritmo baseline
+%(envío fijo por \texttt{toLnk[0]}), el impacto en demora y utilización de
+%enlaces, y el criterio con el que evaluarán si una estrategia es ``mejor''
+%(p.\,ej.\ menor demora media, menor variabilidad, ausencia de bucles, mayor
+%throughput sostenible).]}
+
+
+%\textit{[Tercer párrafo sugerido: resuma en 2--3 oraciones qué algoritmo
+%propusieron y cuál fue la mejora principal observada, sin entrar aún en detalle
+%técnico.]}
+Resumiendo, el modelo modificado busca cual es la distancia de un nodo a otro en sentido horario y antihorario,
+decide cual es menor, por lo tanto más eficiente, y recorre los nodos en ese sentido.
+
+%Este artículo reporta el análisis y diseño de estrategias de enrutamiento
+%implementadas sobre el modelo de red del Laboratorio~4. \textit{[Reemplace este
+%párrafo con su introducción: contexto, motivación, objetivos específicos del
+%grupo y organización del paper (Secciones~\ref{sec:modelo}--\ref{sec:conclusiones}).]}
+
+%\textit{[Segundo párrafo sugerido: describa la limitación del algoritmo baseline
+%(envío fijo por \texttt{toLnk[0]}), el impacto en demora y utilización de
+%enlaces, y el criterio con el que evaluarán si una estrategia es ``mejor''
+%(p.\,ej.\ menor demora media, menor variabilidad, ausencia de bucles, mayor
+%throughput sostenible).]}
+
+%\textit{[Tercer párrafo sugerido: resuma en 2--3 oraciones qué algoritmo
+%propusieron y cuál fue la mejora principal observada, sin entrar aún en detalle
+%técnico.]}
 
 \section{Escenario y modelo de simulación}
 \label{sec:modelo}
@@ -352,7 +388,7 @@ la red permanece estable porque \underline{\hspace{4cm}}.]}
 
 \begin{table}[!ht]
   \centering
-  \caption{Exploración del Caso~2: métricas vs.\ \texttt{interArrivalTime} (plantilla).}
+  \caption{Exploración del Caso~2: métricas vs.\ \texttt{interArrivalTime}.}
   \label{tab:caso2-sweep}
   \coltablesetup
   \resizebox{\columnwidth}{!}{%
