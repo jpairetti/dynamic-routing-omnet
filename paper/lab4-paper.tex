@@ -148,125 +148,157 @@ el cuál resultaría más eficiente, ya que recorrería 3 nodos.
 Resumiendo, el modelo modificado busca cual es la distancia de un nodo a otro en sentido horario y antihorario,
 decide cual es menor, por lo tanto más eficiente, y recorre los nodos en ese sentido.
 
-%Este artículo reporta el análisis y diseño de estrategias de enrutamiento
-%implementadas sobre el modelo de red del Laboratorio~4. \textit{[Reemplace este
-%párrafo con su introducción: contexto, motivación, objetivos específicos del
-%grupo y organización del paper (Secciones~\ref{sec:modelo}--\ref{sec:conclusiones}).]}
-
-%\textit{[Segundo párrafo sugerido: describa la limitación del algoritmo baseline
-%(envío fijo por \texttt{toLnk[0]}), el impacto en demora y utilización de
-%enlaces, y el criterio con el que evaluarán si una estrategia es ``mejor''
-%(p.\,ej.\ menor demora media, menor variabilidad, ausencia de bucles, mayor
-%throughput sostenible).]}
-
-%\textit{[Tercer párrafo sugerido: resuma en 2--3 oraciones qué algoritmo
-%propusieron y cuál fue la mejora principal observada, sin entrar aún en detalle
-%técnico.]}
-
 \section{Escenario y modelo de simulación}
 \label{sec:modelo}
 
-\guia{%
-  Describa la topología (anillo de 8 nodos, interfaces \texttt{lnk[0]} y
-  \texttt{lnk[1]}), las capas (\texttt{app}, \texttt{net}, \texttt{lnk}) y los
-  parámetros relevantes del \texttt{omnetpp.ini}. Incluya al menos una figura
-  (diagrama de topología o captura del modelo en el IDE). Referencie figuras y
-  tablas en el texto: ``como muestra la Fig.~\ref{fig:topologia}''.
-}
+%\guia{%
+%  Describa la topología (anillo de 8 nodos, interfaces \texttt{lnk[0]} y
+%  \texttt{lnk[1]}), las capas (\texttt{app}, \texttt{net}, \texttt{lnk}) y los
+%  parámetros relevantes del \texttt{omnetpp.ini}. Incluya al menos una figura
+%  (diagrama de topología o captura del modelo en el IDE). Referencie figuras y
+%  tablas en el texto: ``como muestra la Fig.~\ref{fig:topologia}''.
+%}
 
 \subsection{Topología y configuración de tráfico}
 
-\textit{[Describa nodos, enlaces full-duplex, fuentes de tráfico y parámetros
-como \texttt{packetByteSize}, \texttt{interArrivalTime}, destinos, etc.]}
+%\textit{[Describa nodos, enlaces full-duplex, fuentes de tráfico y parámetros
+%como \texttt{packetByteSize}, \texttt{interArrivalTime}, destinos, etc.]}
 
-\guia{%
-  Incluya una tabla resumen de la configuración por escenario (Caso~1, Caso~2,
-  comparación). Indique tiempo de simulación, semilla (\texttt{seed-set}), tasa
-  de generación y tamaño de paquete. Esto permite reproducir sus experimentos.
-}
+%\guia{%
+%  Incluya una tabla resumen de la configuración por escenario (Caso~1, Caso~2,
+%  comparación). Indique tiempo de simulación, semilla (\texttt{seed-set}), tasa
+%  de generación y tamaño de paquete. Esto permite reproducir sus experimentos.
+%}
+
+\begin{figure}[!h]
+  \centering
+  % Opción A: figura generada por ustedes (descomente y ajuste la ruta)
+  \includegraphics[width=\linewidth]{figuras/topologia-anillo.pdf}
+  
+  % Opción B: placeholder vectorial mientras no tengan la figura final
+  %\begin{tikzpicture}[
+  %  ring node/.style={
+  %    circle, draw=gray!70!black, thick, fill=blue!5,
+  %    minimum size=7mm, inner sep=0pt,
+  %    font=\scriptsize\bfseries
+  %  },
+  %  fwd link/.style={
+  %    ->, >=Stealth, thick, draw=gray!55!black,
+  %    shorten >=1.8mm, shorten <=1.8mm
+  %  },
+  %]
+  %  \def\radius{1.45}
+    % Nodos equiespaciados sobre un círculo (0 arriba, sentido antihorario)
+  %  \foreach \i in {0,1,2,3,4,5,6,7} {
+  %    \pgfmathsetmacro{\nodeangle}{90 + 45*\i}
+  %    \node[ring node] (n\i) at (\nodeangle:\radius) {\i};
+  %  }
+    % Círculo guía (opcional, refuerza la topología en anillo)
+  %  \draw[gray!30, dashed, line width=0.4pt] (0,0) circle (\radius);
+    % Enlaces dirigidos entre vecinos consecutivos
+  %  \foreach \i/\j in {0/1,1/2,2/3,3/4,4/5,5/6,6/7,7/0} {
+  %    \draw[fwd link] (n\i) -- (n\j);
+  %    \draw[fwd link] (n\j) -- (n\i);
+  %  }
+  %\end{tikzpicture}
+  \caption{Topología en anillo de 8 nodos graficada en OMNeT++.}
+  \label{fig:topologia}
+\end{figure}
+
+El modelo consiste en una red en forma de anillo de 8 nodos implementada en OMNeT++.
+Cada nodo se conecta con sus dos vecinos mediante enlaces \textit{full-duplex}
+(bidireccionales) de 1\,Mbps de capacidad y 100\,µs de delay, formando un
+anillo cerrado. Los nodos se indexan del 0 al 7; el nodo \texttt{node[1]}
+tiene como vecinos a \texttt{node[0]} (interfaz \texttt{lnk[0]}) y a
+\texttt{node[2]} (interfaz \texttt{lnk[1]}), y así sucesivamente.
+
+Internamente, cada nodo está compuesto por tres capas:
+\begin{itemize}
+  \item \textbf{Capa de aplicación} (\texttt{app}): genera paquetes con un
+  tamaño configurable (\texttt{packetByteSize}) a intervalos aleatorios
+  distribuidos exponencialmente (\texttt{interArrivalTime}), y registra la
+  demora extremo a extremo de los paquetes recibidos.
+  \item \textbf{Capa de red} (\texttt{net}): recibe paquetes desde \texttt{app}
+  o desde las capas de enlace, y decide por qué interfaz reenviarlos según
+  el algoritmo de enrutamiento implementado.
+  \item \textbf{Capas de enlace} (\texttt{lnk[0]} y \texttt{lnk[1]}): modelan
+  un buffer de salida y el canal físico hacia cada vecino.
+\end{itemize}
+
+Como muestra la Fig.~\ref{fig:topologia}, el tráfico puede circular en sentido
+horario (por \texttt{lnk[0]}) o antihorario (por \texttt{lnk[1]}). El kickstarter utiliza siempre \texttt{lnk[0]},
+independientemente del destino.
+
+Se definen dos escenarios de tráfico, resumidos en la
+Tabla~\ref{tab:config}:
+
+\begin{itemize}
+  \item \textbf{Caso 1}: \texttt{node[0]} y \texttt{node[2]} transmiten
+  paquetes hacia \texttt{node[5]}.
+  \item \textbf{Caso 2}: los 7 nodos restantes (0--4, 6--7) transmiten
+  simultáneamente hacia \texttt{node[5]} con los mismos parámetros de tráfico.
+\end{itemize}
 
 \begin{table}[!ht]
   \centering
-  \caption{Configuración experimental por escenario (plantilla).}
+  \caption{Configuración experimental por escenario.}
   \label{tab:config}
   \coltablesetup
   \resizebox{\columnwidth}{!}{%
   \begin{tabular}{@{}lccc@{}}
-    \toprule
-    \textbf{Parámetro} & \textbf{Caso 1} & \textbf{Caso 2} & \textbf{Comp.} \\
     \midrule
     Fuentes activas & \texttt{n[0]}, \texttt{n[2]} & 7 $\to$ \texttt{n[5]} & 1 y 2 \\
-    Destino & \texttt{n[5]} & \texttt{n[5]} & idem \\
-    \texttt{packetByteSize} & \textit{[val.]} & \textit{[val.]} & \textit{[val.]} \\
-    \texttt{interArrivalTime} & \textit{[val.]} & \textit{[rango]} & \textit{[val.]} \\
-    T. simulación (s) & \textit{[val.]} & \textit{[val.]} & \textit{[val.]} \\
-    Semilla & \textit{[val.]} & \textit{[val.]} & \textit{[val.]} \\
+    Destino & \texttt{n[5]} & \texttt{n[5]} & \texttt{n[5]} \\
+    \texttt{packetByteSize} (B) & 125000 & 125000 & 125000 \\
+    \texttt{interArrivalTime} & \texttt{exp(1)} & \texttt{exp(1)} & \texttt{exp(1)} \\
+    T. simulación (s) & 200 & 200 & 200 \\
+    Semilla & 0 & 0 & 0 \\
     \bottomrule
   \end{tabular}%
   }
 \end{table}
 
-\begin{figure}[!t]
-  \centering
-  % Opción A: figura generada por ustedes (descomente y ajuste la ruta)
-  % \includegraphics[width=\linewidth]{figuras/topologia-anillo.pdf}
-  %
-  % Opción B: placeholder vectorial mientras no tengan la figura final
-  \begin{tikzpicture}[
-    ring node/.style={
-      circle, draw=gray!70!black, thick, fill=blue!5,
-      minimum size=7mm, inner sep=0pt,
-      font=\scriptsize\bfseries
-    },
-    fwd link/.style={
-      ->, >=Stealth, thick, draw=gray!55!black,
-      shorten >=1.8mm, shorten <=1.8mm
-    },
-  ]
-    \def\radius{1.45}
-    % Nodos equiespaciados sobre un círculo (0 arriba, sentido antihorario)
-    \foreach \i in {0,1,2,3,4,5,6,7} {
-      \pgfmathsetmacro{\nodeangle}{90 + 45*\i}
-      \node[ring node] (n\i) at (\nodeangle:\radius) {\i};
-    }
-    % Círculo guía (opcional, refuerza la topología en anillo)
-    \draw[gray!30, dashed, line width=0.4pt] (0,0) circle (\radius);
-    % Enlaces dirigidos entre vecinos consecutivos
-    \foreach \i/\j in {0/1,1/2,2/3,3/4,4/5,5/6,6/7,7/0} {
-      \draw[fwd link] (n\i) -- (n\j);
-      \draw[fwd link] (n\j) -- (n\i);
-    }
-  \end{tikzpicture}
-  \caption{Topología en anillo de 8 nodos (ejemplo). Reemplace por su figura
-  exportada desde OMNeT++ o por un diagrama propio.}
-  \label{fig:topologia}
-\end{figure}
-
 \subsection{Métricas registradas}
 
-\guia{%
-  Liste \textbf{todas} las estadísticas que instrumentaron en el modelo:
-  demora extremo a extremo, saltos por paquete, ocupación de buffers, tasa de
-  utilización de enlaces, paquetes descartados, etc. Explique \emph{cómo} se
-  midió cada métrica (módulo, vector, escalar, intervalo de muestreo).
-}
+Se instrumentaron las siguientes métricas en el modelo:
+
+\begin{itemize}
+  \item \textbf{Demora extremo a extremo}: tiempo transcurrido desde que un
+  paquete es generado en la capa de aplicación del nodo origen hasta que es
+  entregado en el nodo destino. Registrada como vector y escalar en
+  \texttt{app}.
+  \item \textbf{Cantidad de saltos}: número de nodos intermedios que atraviesa
+  cada paquete. Se incrementa en cada paso por la capa \texttt{net} y se
+  registra al llegar al destino.
+  \item \textbf{Ocupación del buffer}: cantidad de paquetes en espera en cada
+  \texttt{lnk}, registrada como vector temporal. Permite identificar
+  saturación en enlaces específicos.
+  \item \textbf{Utilización del enlace}: fracción del tiempo en que el canal
+  estuvo ocupado transmitiendo. Calculada en cada \texttt{lnk} como escalar
+  al final de la simulación.
+\end{itemize}
+%\guia{%
+%  Liste \textbf{todas} las estadísticas que instrumentaron en el modelo:
+%  demora extremo a extremo, saltos por paquete, ocupación de buffers, tasa de
+%  utilización de enlaces, paquetes descartados, etc. Explique \emph{cómo} se
+% midió cada métrica (módulo, vector, escalar, intervalo de muestreo).
+%}
 
 \begin{table}[!ht]
   \centering
-  \caption{Métricas instrumentadas en el simulador (ejemplo de formato).}
+  \caption{Métricas instrumentadas en el simulador.}
   \label{tab:metricas}
   \coltablesetup
   \resizebox{\columnwidth}{!}{%
   \begin{tabular}{@{}lcc@{}}
     \toprule
-    \textbf{Métrica} & \textbf{Módulo} & \textbf{Unid.} \\
+    \textbf{Métrica} & \textbf{Módulo} & \textbf{Unidad} \\
     \midrule
-    Demora E2E          & \textit{[compl.]} & s \\
-    Saltos / paquete    & \textit{[compl.]} & adim. \\
-    Ocupación buffer    & \textit{[compl.]} & pkts \\
-    Utilización enlace  & \textit{[compl.]} & \% \\
-  \bottomrule
-  \end{tabular}%
+    Demora E2E       & \texttt{app} & s \\
+    Ocupación buffer & \texttt{lnk[0]} & pkts \\
+    Saltos/paquete   & \texttt{net} & adim. \\
+    \bottomrule
+  \end{tabular}
   }
 \end{table}
 
