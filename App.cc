@@ -12,6 +12,8 @@ private:
     cMessage *sendMsgEvent;
     cStdDev delayStats;
     cOutVector delayVector;
+    cStdDev hopCountStats;
+    cOutVector hopCountVector;
 public:
     App();
     virtual ~App();
@@ -43,12 +45,16 @@ void App::initialize() {
     // Initialize statistics
     delayStats.setName("TotalDelay");
     delayVector.setName("Delay");
+    hopCountStats.setName("TotalHopCount");
+    hopCountVector.setName("HopCount");
 }
 
 void App::finish() {
     // Record statistics
     recordScalar("Average delay", delayStats.getMean());
     recordScalar("Number of packets", delayStats.getCount());
+    recordScalar("Average hop count", hopCountStats.getMean());
+    recordScalar("Max hop count", hopCountStats.getMax());
 }
 
 void App::handleMessage(cMessage *msg) {
@@ -71,10 +77,17 @@ void App::handleMessage(cMessage *msg) {
     }
     // else, msg is a packet from net layer
     else {
+        Packet *pkt = (Packet *) msg;
+
         // compute delay and record statistics
         simtime_t delay = simTime() - msg->getCreationTime();
         delayStats.collect(delay);
         delayVector.record(delay);
+
+        // record how many intermediate nodes the packet went through
+        hopCountStats.collect(pkt->getHopCount());
+        hopCountVector.record(pkt->getHopCount());
+
         // delete msg
         delete (msg);
     }

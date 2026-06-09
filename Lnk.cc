@@ -12,6 +12,7 @@ private:
     cQueue buffer;
     cMessage *endServiceEvent;
     simtime_t serviceTime;
+    simtime_t busyTime;
     cOutVector bufferSizeVector;
 public:
     Lnk();
@@ -28,6 +29,7 @@ Define_Module(Lnk);
 
 Lnk::Lnk() {
     endServiceEvent = NULL;
+    busyTime = SIMTIME_ZERO;
 }
 
 Lnk::~Lnk() {
@@ -40,6 +42,8 @@ void Lnk::initialize() {
 }
 
 void Lnk::finish() {
+    // fraction of the simulation the channel spent transmitting a packet
+    recordScalar("Link utilization", busyTime / simTime());
 }
 
 void Lnk::handleMessage(cMessage *msg) {
@@ -52,6 +56,7 @@ void Lnk::handleMessage(cMessage *msg) {
             // send
             send(pkt, "toOut$o");
             serviceTime = pkt->getDuration();
+            busyTime += serviceTime;
             scheduleAt(simTime() + serviceTime, endServiceEvent);
         }
     } else { // msg is a packet
