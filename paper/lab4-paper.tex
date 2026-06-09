@@ -80,12 +80,30 @@
 
   \begin{abstract}
   \noindent
-  Write a concise abstract in English (150--250 words). Summarize the simulated
-  network scenarios, the routing algorithm you designed, the main performance
-  metrics (delay, hop count, buffer/link utilization, stability), and the key
-  findings when comparing your solution against the kickstarter baseline.
-  Mention whether routing loops were observed and, if applicable, how your
-  algorithm generalizes to arbitrary topologies.
+  We analyze and redesign the routing layer of an 8-node ring network simulated
+  in OMNeT++. We first characterize the kickstarter baseline, which always
+  forwards through interface \texttt{lnk[0]} (clockwise), under two traffic
+  scenarios: two sources and seven concurrent sources sending towards a common
+  destination. Both scenarios show that this fixed rule concentrates all
+  traffic on a single direction of the ring, leaving half of the link capacity
+  idle and creating a saturated merge point ($\rho \approx 2$) in the light
+  scenario, and a single converging bottleneck ($\rho \approx 7$) with an
+  empirical stability threshold near \texttt{interArrivalTime} $\approx 7$\,s in
+  the heavy one. We then design a distance-vector-style algorithm in which
+  every node periodically floods small \texttt{HELLO} control packets in both
+  directions; nodes use the hop count carried by these packets to build a local
+  routing table and forward data through whichever interface yields the
+  shortest known path, falling back to the kickstarter rule while the table is
+  still converging. Re-running both scenarios with identical traffic, channels
+  and random seed shows reductions of about 87\% in mean delay and 91\% in peak
+  buffer occupancy for the light scenario, an exact doubling of sustained
+  throughput in the heavy one (199 vs.\ 398 delivered packets in 200\,s), and a
+  drop in the empirical stability threshold from $\approx$7\,s to
+  $\approx$4--5\,s. No routing loops were observed in any run, a direct
+  consequence of a HELLO-forwarding rule that is loop-free by construction on a
+  ring. We close by discussing, conceptually, how the approach would need to
+  change to generalize to arbitrary topologies (e.g.\ a star network) and how
+  it would tolerate node failures -- both left as future work.
   \end{abstract}
 
   \begin{IEEEkeywords}
@@ -102,15 +120,6 @@
 
 \section{Introducción}
 \label{sec:intro}
-
-%\guia{%
-%  Presente el problema del laboratorio: enrutamiento en una capa de red con
-%  múltiples entradas y salidas. Explique brevemente el modelo en anillo del
-%  kickstarter, sus limitaciones (p.\,ej.\ siempre usa \texttt{toLnk[0]}) y el
-%  objetivo de su trabajo: analizar el baseline, diseñar una estrategia mejor
-%  y evaluarla con datos. Cierre con una frase que anticipe las conclusiones
-%  principales. Extensión sugerida: 1 columna (medio párrafo denso).
-%}
 
 Este artículo reporta el análisis y diseño de estrategias de enrutamiento
 implementadas sobre el modelo de red del Laboratorio~4. Fue desarrollado por el grupo de forma tal que se priorizó la discusión total
@@ -131,76 +140,17 @@ se recorrerían 5 nodos. En cambio, si se hiciera con el modelo modificado, se c
 el cuál resultaría más eficiente, ya que recorrería 3 nodos.
 
 
-%\textit{[Reemplace este
-%párrafo con su introducción: contexto, motivación, objetivos específicos del
-%grupo y organización del paper (Secciones~\ref{sec:modelo}--\ref{sec:conclusiones}).]}
-
-%\textit{[Segundo párrafo sugerido: describa la limitación del algoritmo baseline
-%(envío fijo por \texttt{toLnk[0]}), el impacto en demora y utilización de
-%enlaces, y el criterio con el que evaluarán si una estrategia es ``mejor''
-%(p.\,ej.\ menor demora media, menor variabilidad, ausencia de bucles, mayor
-%throughput sostenible).]}
-
-
-%\textit{[Tercer párrafo sugerido: resuma en 2--3 oraciones qué algoritmo
-%propusieron y cuál fue la mejora principal observada, sin entrar aún en detalle
-%técnico.]}
 Resumiendo, el modelo modificado busca cual es la distancia de un nodo a otro en sentido horario y antihorario,
 decide cual es menor, por lo tanto más eficiente, y recorre los nodos en ese sentido.
 
 \section{Escenario y modelo de simulación}
 \label{sec:modelo}
 
-%\guia{%
-%  Describa la topología (anillo de 8 nodos, interfaces \texttt{lnk[0]} y
-%  \texttt{lnk[1]}), las capas (\texttt{app}, \texttt{net}, \texttt{lnk}) y los
-%  parámetros relevantes del \texttt{omnetpp.ini}. Incluya al menos una figura
-%  (diagrama de topología o captura del modelo en el IDE). Referencie figuras y
-%  tablas en el texto: ``como muestra la Fig.~\ref{fig:topologia}''.
-%}
-
 \subsection{Topología y configuración de tráfico}
-
-%\textit{[Describa nodos, enlaces full-duplex, fuentes de tráfico y parámetros
-%como \texttt{packetByteSize}, \texttt{interArrivalTime}, destinos, etc.]}
-
-%\guia{%
-%  Incluya una tabla resumen de la configuración por escenario (Caso~1, Caso~2,
-%  comparación). Indique tiempo de simulación, semilla (\texttt{seed-set}), tasa
-%  de generación y tamaño de paquete. Esto permite reproducir sus experimentos.
-%}
 
 \begin{figure}[!h]
   \centering
-  % Opción A: figura generada por ustedes (descomente y ajuste la ruta)
   \includegraphics[width=\linewidth]{figuras/topologia-anillo.pdf}
-  
-  % Opción B: placeholder vectorial mientras no tengan la figura final
-  %\begin{tikzpicture}[
-  %  ring node/.style={
-  %    circle, draw=gray!70!black, thick, fill=blue!5,
-  %    minimum size=7mm, inner sep=0pt,
-  %    font=\scriptsize\bfseries
-  %  },
-  %  fwd link/.style={
-  %    ->, >=Stealth, thick, draw=gray!55!black,
-  %    shorten >=1.8mm, shorten <=1.8mm
-  %  },
-  %]
-  %  \def\radius{1.45}
-    % Nodos equiespaciados sobre un círculo (0 arriba, sentido antihorario)
-  %  \foreach \i in {0,1,2,3,4,5,6,7} {
-  %    \pgfmathsetmacro{\nodeangle}{90 + 45*\i}
-  %    \node[ring node] (n\i) at (\nodeangle:\radius) {\i};
-  %  }
-    % Círculo guía (opcional, refuerza la topología en anillo)
-  %  \draw[gray!30, dashed, line width=0.4pt] (0,0) circle (\radius);
-    % Enlaces dirigidos entre vecinos consecutivos
-  %  \foreach \i/\j in {0/1,1/2,2/3,3/4,4/5,5/6,6/7,7/0} {
-  %    \draw[fwd link] (n\i) -- (n\j);
-  %    \draw[fwd link] (n\j) -- (n\i);
-  %  }
-  %\end{tikzpicture}
   \caption{Topología en anillo de 8 nodos graficada en OMNeT++.}
   \label{fig:topologia}
 \end{figure}
@@ -246,6 +196,8 @@ Tabla~\ref{tab:config}:
   \coltablesetup
   \resizebox{\columnwidth}{!}{%
   \begin{tabular}{@{}lccc@{}}
+    \toprule
+     & \textbf{Caso 1} & \textbf{Caso 2} & \textbf{Comparación} \\
     \midrule
     Fuentes activas & \texttt{n[0]}, \texttt{n[2]} & 7 $\to$ \texttt{n[5]} & 1 y 2 \\
     Destino & \texttt{n[5]} & \texttt{n[5]} & \texttt{n[5]} \\
@@ -277,12 +229,6 @@ Se instrumentaron las siguientes métricas en el modelo:
   estuvo ocupado transmitiendo. Calculada en cada \texttt{lnk} como escalar
   al final de la simulación.
 \end{itemize}
-%\guia{%
-%  Liste \textbf{todas} las estadísticas que instrumentaron en el modelo:
-%  demora extremo a extremo, saltos por paquete, ocupación de buffers, tasa de
-%  utilización de enlaces, paquetes descartados, etc. Explique \emph{cómo} se
-% midió cada métrica (módulo, vector, escalar, intervalo de muestreo).
-%}
 
 \begin{table}[!ht]
   \centering
@@ -294,9 +240,10 @@ Se instrumentaron las siguientes métricas en el modelo:
     \toprule
     \textbf{Métrica} & \textbf{Módulo} & \textbf{Unidad} \\
     \midrule
-    Demora E2E       & \texttt{app} & s \\
-    Ocupación buffer & \texttt{lnk[0]} & pkts \\
-    Saltos/paquete   & \texttt{net} & adim. \\
+    Demora E2E         & \texttt{app}            & s \\
+    Saltos/paquete     & \texttt{net} / \texttt{app} & adim. \\
+    Ocupación buffer   & \texttt{lnk[0..1]}      & pkts \\
+    Utilización enlace & \texttt{lnk[0..1]}      & adim.\ ($[0,1]$) \\
     \bottomrule
   \end{tabular}
   }
@@ -305,37 +252,60 @@ Se instrumentaron las siguientes métricas en el modelo:
 \section{Tarea de análisis: evaluación del kickstarter}
 \label{sec:analisis}
 
-\guia{%
-  Esta sección responde la \textbf{Tarea de Análisis} del enunciado. Presente
-  los Casos~1 y~2 por separado. Cada caso debe incluir: (i)~configuración
-  experimental, (ii)~tabla o gráfico con resultados, (iii)~interpretación
-  basada en datos y (iv)~respuesta explícita a las preguntas del enunciado.
-  \textbf{No} afirme mejoras o saturación sin mostrar números, curvas o
-  barras comparativas.
-}
-
 \subsection{Caso 1: tráfico configurado (\texttt{node[0]} y \texttt{node[2]} $\rightarrow$ \texttt{node[5]})}
 
-\guia{%
-  Ejecute el modelo con la configuración por defecto del kickstarter. Reporte
-  demoras, saltos, uso de buffers y enlaces. Responda: ¿qué métricas obtienen?
-  ¿cómo se usan los recursos? ¿se puede mejorar y por qué?
-}
+Bajo la configuración por defecto del kickstarter (Tabla~\ref{tab:config},
+columna ``Caso 1''), \texttt{node[0]} y \texttt{node[2]} generan tráfico hacia
+\texttt{node[5]} a una tasa media de un paquete por segundo cada uno
+(\texttt{exponential(1)}), con paquetes de 125000\,B que insumen exactamente 1
+segundo de transmisión por enlace (a 1\,Mbps). La Tabla~\ref{tab:caso1} resume
+las cuatro métricas instrumentadas al cabo de 200\,s de simulación.
 
-\textit{[Análisis narrativo apoyado en Tabla~\ref{tab:caso1} y
-Fig.~\ref{fig:caso1-demora}. Describa si un sentido del anillo concentra tráfico,
-si hay nodos intermedios más cargados y si las colas crecen de forma sostenida.]}
+La demora media observada fue de 51.16\,s (máximo 105.56\,s, desviación
+28.31\,s), y cada paquete recorrió en promedio 3.92 saltos --- un valor muy
+cercano al máximo posible de 5, que es justamente la distancia \emph{en sentido
+horario} entre \texttt{node[2]} y \texttt{node[5]}. Esto ya sugiere que el
+algoritmo no usa el camino más corto disponible: en sentido antihorario,
+\texttt{node[2]} llegaría a \texttt{node[5]} en sólo 3 saltos
+(\texttt{2}$\to$\texttt{3}$\to$\texttt{4}$\to$\texttt{5}).
 
-\guia{%
-  Ejemplo de afirmación bien respaldada: ``La demora media fue 0.82\,s
-  (Tabla~\ref{tab:caso1}), un 35\% mayor en el flujo desde \texttt{node[0]} por
-  la mayor distancia en saltos (Fig.~\ref{fig:caso1-demora}).'' Evite frases
-  vagas como ``la red anduvo bien'' sin citar datos.
-}
+La Fig.~\ref{fig:caso1-demora} grafica la utilización de cada interfaz de cada
+nodo y deja ver con claridad que \emph{todo} el tráfico circula por
+\texttt{lnk[0]} (sentido horario): los cinco nodos del arco que va de
+\texttt{node[2]} a \texttt{node[5]} pasando por \texttt{node[0]} ---es decir
+\texttt{node[2]}, \texttt{node[1]}, \texttt{node[0]}, \texttt{node[7]} y
+\texttt{node[6]}--- presentan utilizaciones de \texttt{lnk[0]} entre 93.5\% y
+99.5\%, mientras que las 16 interfaces \texttt{lnk[1]} de la red permanecen en
+0\%. La gran desviación de la utilización de enlace que muestra la
+Tabla~\ref{tab:caso1} (44.9 puntos porcentuales sobre un promedio de apenas
+30.3\%) es la huella numérica de esa asimetría: la mitad de la capacidad de la
+red --- el sentido antihorario completo --- queda ociosa.
+
+El enlace más cargado es \texttt{node[0].lnk[0]}, con 99.5\% de utilización. No
+es casualidad: es el punto donde confluyen los dos flujos, ya que el camino
+horario de \texttt{node[2]} (\texttt{2}$\to$\texttt{1}$\to$\texttt{0}$\to$%
+\texttt{7}$\to$\texttt{6}$\to$\texttt{5}, 5 saltos) pasa por \texttt{node[0]}
+antes de seguir junto con el tráfico que \texttt{node[0]} genera para sí mismo.
+La carga ofrecida sobre ese enlace es entonces, en régimen, la suma de ambas
+fuentes ($\rho \approx 2\lambda = 2$ paquetes/s), el doble de lo que puede
+servir (1 paquete/s, fijado por \texttt{packetByteSize} y la tasa del canal).
+El resultado es una cola que crece de forma sostenida durante toda la
+simulación --- de 0 a 190 paquetes en 200\,s, con una ocupación media de 91.3
+(Tabla~\ref{tab:caso1}) --- sin alcanzar nunca un régimen estacionario.
+
+En síntesis: los recursos se usan de forma muy desigual (la mitad de los
+enlaces ociosos, y en el otro extremo un punto de fusión saturado al doble de
+su capacidad), y claramente \emph{se puede mejorar}: alcanzaría con decidir el
+sentido de envío según la distancia real al destino en lugar de hacerlo siempre
+en sentido horario. Esa es la idea central del algoritmo que presentamos en la
+Sección~\ref{sec:diseno}.
 
 \begin{table}[!ht]
   \centering
-  \caption{Resultados del Caso~1 (baseline kickstarter). Reemplace los valores.}
+  \caption{Resultados del Caso~1 (baseline kickstarter, 200\,s, semilla 0). La
+  fila ``Ocupación buffer'' corresponde al enlace más cargado
+  (\texttt{node[0].lnk[0]}); ``Util.\ enlace'' resume la distribución de
+  utilización entre las 16 interfaces de la red.}
   \label{tab:caso1}
   \coltablesetup
   \resizebox{\columnwidth}{!}{%
@@ -343,10 +313,10 @@ si hay nodos intermedios más cargados y si las colas crecen de forma sostenida.
     \toprule
     \textbf{Métrica} & \textbf{Prom.} & \textbf{Máx.} & \textbf{Desv.} \\
     \midrule
-    Demora (s)        & 0.00 & 0.00 & 0.00 \\
-    Saltos            & 0.0  & 0    & 0.0  \\
-    Ocupación buffer  & 0.0  & 0    & 0.0  \\
-    Util. enlace (\%) & 0.0  & 0.0  & 0.0  \\
+    Demora (s)        & 51.16 & 105.56 & 28.31 \\
+    Saltos            & 3.92  & 5      & 1.00  \\
+    Ocupación buffer (\texttt{n[0].lnk[0]}, pkts) & 91.28 & 190 & 54.83 \\
+    Util. enlace (\%, las 16 interfaces) & 30.3 & 99.5 & 44.9 \\
     \bottomrule
   \end{tabular}%
   }
@@ -354,127 +324,160 @@ si hay nodos intermedios más cargados y si las colas crecen de forma sostenida.
 
 \begin{figure}[!t]
   \centering
-  \begin{tikzpicture}
-    \begin{axis}[
-      width=\linewidth,
-      height=4.2cm,
-      ybar,
-      bar width=8pt,
-      ymin=0,
-      symbolic x coords={Demora,Saltos,Buffer,Enlace},
-      xtick=data,
-      x tick label style={font=\scriptsize, rotate=25, anchor=east},
-      ylabel={Valor norm.},
-      title={\scriptsize Ejemplo: comparación de métricas (Caso 1)},
-      legend style={font=\scriptsize, at={(0.5,1.05)}, anchor=south, legend columns=-1},
-    ]
-      \addplot coordinates {(Demora,0.42) (Saltos,0.55) (Buffer,0.31) (Enlace,0.48)};
-      \addplot coordinates {(Demora,0.35) (Saltos,0.50) (Buffer,0.28) (Enlace,0.40)};
-      \legend{Fuente 0, Fuente 2}
-    \end{axis}
-  \end{tikzpicture}
-  \caption{Ejemplo de gráfico de barras. Exporte datos desde OMNeT++ (Scalar
-  Export / Python / R) y genere gráficos similares con valores reales.}
+  \includegraphics[width=\linewidth]{figuras/fig-caso1-utilizacion.pdf}
+  \caption{Caso 1 (kickstarter): utilización de \texttt{lnk[0]} (horario) y
+  \texttt{lnk[1]} (antihorario) en cada nodo. Todo el tráfico de ambos flujos
+  circula por \texttt{lnk[0]}; las 16 interfaces \texttt{lnk[1]} quedan en 0\%.}
   \label{fig:caso1-demora}
 \end{figure}
 
 \subsection{Caso 2: tráfico sostenido hacia \texttt{node[5]}}
+\label{sec:caso2}
 
-\guia{%
-  Configure todos los nodos $(0,1,2,3,4,6,7)$ enviando a \texttt{node[5]} con
-  el mismo \texttt{packetByteSize} e \texttt{interArrivalTime}. Varíe
-  \texttt{interArrivalTime} sistemáticamente y muestre en un gráfico cuándo la
-  red deja de ser estable (colas crecientes, demoras divergentes, pérdidas).
-  Indique el valor umbral estimado y justifíquelo con evidencia.
-}
+Activamos ahora las siete fuentes restantes (\texttt{node[0]} a
+\texttt{node[4]}, \texttt{node[6]} y \texttt{node[7]}, columna ``Caso 2'' de la
+Tabla~\ref{tab:config}) con los mismos parámetros que en el Caso 1
+(\texttt{interArrivalTime} medio de 1\,s, paquetes de 125000\,B), todas hacia
+\texttt{node[5]}.
 
-\begin{figure}[!t]
-  \centering
-  \begin{tikzpicture}
-    \begin{axis}[
-      width=\linewidth,
-      height=4.5cm,
-      xlabel={\texttt{interArrivalTime} (s)},
-      ylabel={Demora media (s)},
-      xmin=0, xmax=10,
-      ymin=0,
-      grid=major,
-      legend style={font=\scriptsize},
-    ]
-      % Reemplace por curva real exportada desde sus experimentos
-      \addplot[thick, blue, mark=*] coordinates {
-        (0.5,2.8)(1,1.9)(2,1.1)(3,0.7)(4,0.55)(5,0.48)(6,0.45)(8,0.43)
-      };
-      \addlegendentry{Demora media E2E}
-      \addplot[thick, red, dashed] coordinates {(0,1.5)(10,1.5)};
-      \addlegendentry{Umbral de estabilidad (ej.)}
-    \end{axis}
-  \end{tikzpicture}
-  \caption{Ejemplo: demora media vs.\ \texttt{interArrivalTime}. Marque el
-  régimen estable y el de saturación.}
-  \label{fig:caso2-estabilidad}
-\end{figure}
+Bajo esta configuración la red queda claramente sobrecargada: la demora media
+subió a 64.53\,s (máximo 184.23\,s, desviación 44.0\,s), y en 200\,s sólo se
+entregaron 199 de los cerca de 1400 paquetes que generan siete fuentes a
+$\approx$1\,paquete/s. Los enlaces \texttt{node[6].lnk[0]} y
+\texttt{node[7].lnk[0]} --- los dos últimos saltos del camino horario hacia
+\texttt{node[5]} --- llegan a 100\% de utilización, con colas que en promedio
+rondan los 82 y 99 paquetes (máximos de 164 y 205) y que, igual que en el Caso
+1, no dejan de crecer dentro de la ventana simulada. El número de saltos
+promedio bajó a 2.06 (máximo 7, la vuelta completa al anillo) simplemente
+porque ahora hay fuentes mucho más cerca de \texttt{node[5]} ---
+\texttt{node[4]} está a un solo salto en sentido horario---, no porque el
+algoritmo haya cambiado su forma de elegir camino.
 
-\textit{[Respuesta explícita: a partir de \texttt{interArrivalTime} = \underline{\hspace{1.2cm}}\,s
-la red permanece estable porque \underline{\hspace{4cm}}.]}
+Para saber si este comportamiento depende de la intensidad del tráfico o es
+estructural, barrimos sistemáticamente \texttt{interArrivalTime} sobre el
+conjunto $\{2,3,4,5,6,7,8,10,15,20\}$\,s (200\,s de simulación por punto,
+configuración \texttt{Caso2Sweep} del \texttt{omnetpp.ini}). Como el modelo no
+descarta paquetes --- los buffers de \texttt{Lnk} son colas \texttt{cQueue}
+sin límite de tamaño ---, no existe una columna de ``pérdidas'' propiamente
+dicha; en su lugar caracterizamos la estabilidad con la \emph{pendiente} de la
+ocupación del buffer del enlace más cargado (\texttt{node[6].lnk[0]}, por el
+que pasan los siete flujos) a lo largo de la corrida, estimada por regresión
+lineal sobre la serie temporal registrada: una pendiente cercana a cero indica
+que la cola converge a un régimen estacionario, y una pendiente claramente
+positiva indica que crece sin cota dentro de la ventana observada. La
+Tabla~\ref{tab:caso2-sweep} resume los resultados, y la
+Fig.~\ref{fig:caso2-estabilidad} grafica la demora media resultante (junto con
+la curva del algoritmo propuesto, que se compara en la
+Sección~\ref{sec:evaluacion}).
 
 \begin{table}[!ht]
   \centering
-  \caption{Exploración del Caso~2: métricas vs.\ \texttt{interArrivalTime}.}
+  \caption{Caso 2: demora media, ocupación media de \texttt{node[6].lnk[0]} y
+  pendiente de su crecimiento vs.\ \texttt{interArrivalTime} (200\,s/punto).
+  ``Estab.'' = Sí cuando la pendiente es $\approx$0 (cola acotada).}
   \label{tab:caso2-sweep}
   \coltablesetup
   \resizebox{\columnwidth}{!}{%
-  \begin{tabular}{@{}rrrrr@{}}
+  \begin{tabular}{@{}rrrrc@{}}
     \toprule
-    \textbf{\texttt{interArriv.}} & \textbf{Demora} & \textbf{Cola} & \textbf{Pérd.} & \textbf{Estab.} \\
+    \textbf{\texttt{interArriv.} (s)} & \textbf{Demora (s)} & \textbf{Cola (pkts)} & \textbf{Pend. (pkts/s)} & \textbf{Estab.} \\
     \midrule
-    0.5 & 2.80 & 48 & 12 & No \\
-    1.0 & 1.90 & 32 & 3  & No \\
-    2.0 & 1.10 & 15 & 0  & Sí \\
-    3.0 & 0.70 & 8  & 0  & Sí \\
-    5.0 & 0.48 & 4  & 0  & Sí \\
-    \textit{[...]} & \textit{[...]} & \textit{[...]} & \textit{[...]} & \textit{[...]} \\
+    2  & 56.90 & 39.30 & $+0.42$ & No \\
+    3  & 48.93 & 29.98 & $+0.36$ & No \\
+    4  & 44.71 & 26.68 & $+0.22$ & No \\
+    5  & 39.84 & 21.66 & $+0.20$ & No \\
+    6  & 23.13 & 11.55 & $+0.15$ & No \\
+    7  &  7.16 &  1.29 & $+0.01$ & Límite \\
+    8  &  5.56 &  0.46 & $+0.00$ & Sí \\
+    10 &  4.71 &  0.24 & $-0.00$ & Sí \\
+    15 &  4.31 &  0.05 & $\approx0$ & Sí \\
+    20 &  4.33 &  0.01 & $\approx0$ & Sí \\
     \bottomrule
   \end{tabular}%
   }
 \end{table}
 
-\guia{%
-  Complete la tabla con sus corridas reales. La columna ``¿Estable?'' debe
-  basarse en un criterio explícito (p.\,ej.\ cola acotada, demora estacionaria,
-  cero pérdidas). Referencie esta tabla al responder el umbral del Caso~2.
-}
+\begin{figure}[!t]
+  \centering
+  \includegraphics[width=\linewidth]{figuras/fig-caso2-estabilidad.pdf}
+  \caption{Demora media extremo a extremo vs.\ \texttt{interArrivalTime} medio
+  para el Caso 2, kickstarter y algoritmo propuesto (Sección~\ref{sec:diseno}).
+  Las líneas punteadas marcan el umbral de estabilidad estimado de cada uno.}
+  \label{fig:caso2-estabilidad}
+\end{figure}
+
+Se observa una transición neta entre \texttt{interArrivalTime} = 6\,s
+(pendiente $+0.15$ paquetes/s, cola todavía en franco crecimiento) y 8\,s
+(pendiente prácticamente nula). \textbf{Concluimos que la red permanece estable
+a partir de \texttt{interArrivalTime} $\approx$ 7\,s}: ese es el punto en que
+la tasa de servicio del cuello de botella (1 paquete/s, fijada por
+\texttt{packetByteSize} y la tasa del canal) iguala la tasa agregada de llegada
+de las siete fuentes que confluyen en él, $\lambda_{total} =
+7/\texttt{interArrivalTime}$. El valor crítico teórico, $\rho =
+\lambda_{total}/\mu = 1$, se alcanza exactamente en \texttt{interArrivalTime} =
+7\,s; la corrida con ese valor exhibe justo el comportamiento esperado en el
+punto crítico --- pendiente residual de apenas $+0.007$ paquetes/s, la cola
+fluctúa mucho pero casi no crece en promedio ---, lo cual nos da bastante
+confianza en que el modelo y la medición son consistentes con la teoría de
+colas elemental ($M/M/1$, $\rho = \lambda/\mu$).
 
 \section{Diseño del algoritmo de enrutamiento propuesto}
 \label{sec:diseno}
 
-\guia{%
-  Corresponde a la \textbf{Tarea de Diseño}. Explique \textbf{qué información}
-  usa cada nodo, \textbf{cómo} la obtiene (p.\,ej.\ paquetes hello/echo, tablas
-  locales) y \textbf{cómo} decide la interfaz de salida. Describa decisiones de
-  diseño, limitaciones y por qué su enfoque supera al baseline. Puede usar
-  pseudocódigo, diagrama de flujo o tabla de reglas. Recuerde: no use
-  \texttt{cTopology} ni iteradores de \texttt{cGate} para descubrir vecinos.
-}
-
 \subsection{Información disponible y estructuras de datos}
 
-\textit{[Describa tablas de rutas, métricas locales, mensajes de control, etc.]}
+Cada nodo dispone únicamente de la información que puede observar
+\emph{localmente}: su propio identificador
+(\texttt{getParentModule()->getIndex()}), la cantidad de interfaces que posee
+(\texttt{gateSize("toLnk\$o")}) y los paquetes que recibe por cada una de
+ellas. La consigna prohíbe usar \texttt{cTopology} o iteradores de
+\texttt{cGate} para conocer la red de antemano, así que en el instante inicial
+un nodo no sabe ni cuántos nodos hay en el anillo ni qué hay del otro lado de
+sus enlaces.
 
-\subsection{Reglas de decisión}
-
-\guia{%
-  Presente el algoritmo en tres niveles: (1)~descripción en prosa, (2)~tabla de
-  reglas o pseudocódigo, (3)~ejemplo numérico con un paquete concreto que atraviesa
-  varios nodos. Si intercambian mensajes de control, muestre el formato del
-  paquete hello/echo en una tabla.
-}
-
-\textit{[Detalle el algoritmo. Ejemplo de pseudocódigo:]}
+Para resolver esto adoptamos un mecanismo de descubrimiento por
+\emph{inundación de paquetes de control} tipo \texttt{HELLO} (en la línea de
+los protocolos de vector de distancias): periódicamente
+(\texttt{helloInterval}, 20\,s por defecto), cada nodo envía un paquete
+\texttt{HELLO} pequeño --- 64\,B, frente a los 125000\,B de un paquete de
+datos: una sobrecarga de control medida en $\approx 0.03\%$ de utilización de
+enlace en nuestras corridas --- por \emph{cada} una de sus interfaces,
+anunciando su propio identificador y un contador de saltos que arranca en 1
+(formato en la Tabla~\ref{tab:hello}).
 
 \begin{table}[!ht]
   \centering
-  \caption{Ejemplo de tabla de rutas locales en un nodo (complete con su diseño).}
+  \caption{Campos relevantes del paquete de control \texttt{HELLO} (reutiliza
+  la clase \texttt{Packet}, distinguido por \texttt{isHello = true}).}
+  \label{tab:hello}
+  \coltablesetup
+  \resizebox{\columnwidth}{!}{%
+  \begin{tabular}{@{}lll@{}}
+    \toprule
+    \textbf{Campo} & \textbf{Significado} & \textbf{Valor} \\
+    \midrule
+    \texttt{source}      & nodo que originó el HELLO     & \texttt{myId} \\
+    \texttt{hopCount}    & saltos recorridos hasta ahora & 1, +1 por salto \\
+    \texttt{destination} & no se usa en control          & $-1$ \\
+    \texttt{byteLength}  & tamaño del paquete            & 64\,B \\
+    \bottomrule
+  \end{tabular}%
+  }
+\end{table}
+
+La estructura central es una tabla de rutas local,
+\texttt{std::map<int, Route>}, con \texttt{Route\{int outGate; int hopCount;\}},
+que asocia cada identificador de destino \emph{conocido} con la interfaz de
+salida y la distancia del mejor camino aprendido hacia él. La
+Tabla~\ref{tab:rutas} muestra cómo luce esta tabla en \texttt{node[1]} una vez
+que la red convergió (situación del Caso 2, Sección~\ref{sec:evaluacion}):
+nótese el empate a 4 saltos hacia \texttt{node[5]}, resuelto --- por el orden
+en que \texttt{node[1]} recibió los \texttt{HELLO} respectivos --- a favor de
+\texttt{lnk[1]}, justo lo que se observó en la simulación.
+
+\begin{table}[!ht]
+  \centering
+  \caption{Tabla de rutas de \texttt{node[1]} una vez convergido el descubrimiento.}
   \label{tab:rutas}
   \coltablesetup
   \resizebox{\columnwidth}{!}{%
@@ -482,53 +485,128 @@ la red permanece estable porque \underline{\hspace{4cm}}.]}
     \toprule
     \textbf{Destino} & \textbf{Interfaz} & \textbf{Saltos} \\
     \midrule
-    \texttt{node[5]} & \texttt{lnk[1]} & 2 \\
-    \texttt{node[0]} & \texttt{lnk[0]} & 3 \\
-    \texttt{node[2]} & \texttt{lnk[0]} & 1 \\
-    \textit{[...]}   & \textit{[...]}  & \textit{[...]} \\
+    \texttt{node[0]} & \texttt{lnk[0]} & 1 \\
+    \texttt{node[7]} & \texttt{lnk[0]} & 2 \\
+    \texttt{node[6]} & \texttt{lnk[0]} & 3 \\
+    \texttt{node[2]} & \texttt{lnk[1]} & 1 \\
+    \texttt{node[3]} & \texttt{lnk[1]} & 2 \\
+    \texttt{node[4]} & \texttt{lnk[1]} & 3 \\
+    \texttt{node[5]} & \texttt{lnk[1]} & 4 $\leftarrow$ \textit{empate, ver texto} \\
     \bottomrule
   \end{tabular}%
   }
 \end{table}
 
+\subsection{Reglas de decisión}
+
+El algoritmo combina dos mecanismos sencillos:
+
+\begin{enumerate}
+  \item \textbf{Aprendizaje de rutas.} Al recibir un \texttt{HELLO} por la
+  interfaz $i$, originado en el nodo $s$ con contador de saltos $h$, el nodo
+  registra ``puedo llegar a $s$ por $i$, a $h$ saltos'' y actualiza su tabla
+  \emph{sólo si} ese camino es estrictamente más corto que el mejor que ya
+  conocía (\texttt{learnRoute}). Luego reenvía el \texttt{HELLO}
+  ---incrementando su contador--- por la interfaz \emph{opuesta} a la de
+  llegada (\texttt{1 - i}). En un anillo, esto garantiza que cada \texttt{HELLO}
+  recorra el anillo exactamente una vez en cada sentido y vuelva a su origen,
+  momento en el que se descarta. No hace falta ningún mecanismo adicional
+  (números de secuencia, TTL) para que la inundación termine: la propia regla
+  ``seguir de largo por la interfaz opuesta'' es, en una topología circular,
+  libre de bucles por construcción.
+  \item \textbf{Reenvío de datos.} Al recibir un paquete cuyo destino no es el
+  nodo local, se incrementa su contador de saltos (estadística \emph{Cantidad
+  de saltos}, Sección~\ref{sec:modelo}) y se busca el destino en
+  \texttt{routingTable}. Si hay una entrada, el paquete se reenvía por la
+  interfaz indicada; si todavía no se aprendió ninguna ruta hacia ese destino
+  ---algo que sólo puede ocurrir en los primerísimos instantes de la
+  simulación, antes de que el primer \texttt{HELLO} complete su recorrido---,
+  el nodo recurre al criterio del \emph{kickstarter} (\texttt{lnk[0]}) como
+  valor por defecto, dándole tiempo al descubrimiento para converger.
+\end{enumerate}
+
 \begin{small}
 \begin{verbatim}
-al recibir paquete p en interfaz i:
-  si dest(p) == id_local:
-    entregar a capa app
+al recibir HELLO por interfaz i, origen s, saltos h:
+  si s == miId:
+    descartar (dio toda la vuelta al anillo)
   sino:
-    j <- elegir_interfaz(p, tablas_locales)
+    si no conozco ruta a s, o h < la conocida:
+      tablaRutas[s] <- (interfaz = i, saltos = h)
+    reenviar por interfaz (1 - i), con saltos = h+1
+
+al recibir paquete de datos p:
+  si destino(p) == miId:
+    entregar a la capa de aplicacion
+  sino:
+    saltos(p) <- saltos(p) + 1
+    si destino(p) en tablaRutas:
+      j <- tablaRutas[destino(p)].interfaz
+    sino:
+      j <- 0   (criterio del kickstarter, mientras converge)
     reenviar p por interfaz j
 \end{verbatim}
 \end{small}
 
+Reutilizamos la misma clase \texttt{Packet} para datos y control,
+distinguiéndolos con el campo booleano \texttt{isHello} (Tabla~\ref{tab:hello}).
+Esa decisión, de paso, nos hizo notar un error latente del \emph{kickstarter}:
+\texttt{App.cc} usa el segundo argumento posicional del constructor de
+\texttt{cMessage} --- que en realidad fija el \emph{kind} del mensaje --- para
+otra cosa, así que distinguir \texttt{HELLO} de datos mediante
+\texttt{setKind()}/\texttt{getKind()} (nuestro primer intento) producía
+colisiones y caídas del simulador; el campo explícito \texttt{isHello} evita el
+problema por completo.
+
+\paragraph{Ejemplo numérico.} Consideremos un paquete generado en
+\texttt{node[2]} con destino \texttt{node[5]} (el flujo del Caso 1 que más se
+beneficia del cambio, Sección~\ref{sec:analisis}). Una vez convergidas las
+tablas, \texttt{node[2]} sabe que \texttt{node[5]} está a 3 saltos por
+\texttt{lnk[1]} (antihorario: \texttt{2}$\to$\texttt{3}$\to$\texttt{4}$\to$%
+\texttt{5}) y a 5 por \texttt{lnk[0]}, así que reenvía por \texttt{lnk[1]}.
+\texttt{node[3]} hace lo mismo: \texttt{node[5]} está a 2 saltos por su
+\texttt{lnk[1]} y a 6 por su \texttt{lnk[0]}; reenvía hacia \texttt{node[4]}.
+Finalmente \texttt{node[4]} ve que \texttt{node[5]} es su vecino directo (1
+salto) y se lo entrega. El paquete recorre \texttt{node[2]} $\to$
+\texttt{node[3]} $\to$ \texttt{node[4]} $\to$ \texttt{node[5]}: 3 saltos, en
+lugar de los 5 que recorría con el kickstarter, y sin pasar nunca por el tramo
+congestionado de la Fig.~\ref{fig:caso1-demora}. Es exactamente lo que se
+observó en la simulación: con el algoritmo propuesto el conteo de saltos del
+Caso 1 fue \emph{constante} e igual a 3 para los 375 paquetes entregados, con
+desviación 0 (Tabla~\ref{tab:comparacion}).
+
 \section{Evaluación comparativa}
 \label{sec:evaluacion}
 
-\guia{%
-  Compare su algoritmo contra el kickstarter en los Casos~1 y~2 (y en otros
-  escenarios si lo desea). Use tablas side-by-side, gráficos de barras
-  agrupados o boxplots de demora. Cuantifique la mejora (\%, factor, absoluto).
-  Responda: ¿cuánto mejoran las métricas? ¿por qué? ¿hubo bucles de
-  enrutamiento?¿Qué pasaría si la cantidad de nodos es mucho mayor y como 
-  funcionaria con respecto al algoritmo propuesto por la cátedra?¿Qué sucedería
-  si se cae un nodo serían tolerantes a esa falla los algoritmos? Si ajustó 
-  parámetros según la nota al pie~4 del enunciado, indíquelo claramente en 
-  la metodología.
-}
-
 \subsection{Metodología de comparación}
 
-\textit{[Describa bajo qué condiciones ejecutó cada algoritmo, si usó los mismos
-escenarios, semillas y parámetros, y cómo calculó promedios o intervalos. Ejemplo:
-``Para cada \texttt{interArrivalTime} del Caso~2 se ejecutaron 5 repeticiones con
-semillas 1--5; reportamos la media y el máximo de demora extremo a extremo.'']}
+Para que la comparación fuera lo más justa posible, agregamos un parámetro
+\texttt{useShortestPath} (booleano, por defecto \texttt{false}) al módulo
+\texttt{Net} e implementamos \emph{ambos} algoritmos --- el del kickstarter y
+el propuesto --- dentro del mismo módulo, activables con ese único parámetro
+(\texttt{network.ned}, configuraciones \texttt{Caso1Propuesto} /
+\texttt{Caso2Propuesto} del \texttt{omnetpp.ini}, que heredan de
+\texttt{Caso1}/\texttt{Caso2} mediante \texttt{extends} y sólo cambian ese
+valor). De este modo cada par de corridas comparte exactamente el mismo
+tráfico generado, los mismos canales y la misma semilla
+(\texttt{seed-set} = 0): cualquier diferencia observada se debe únicamente a la
+decisión de enrutamiento. No hicimos repeticiones con semillas distintas por
+una cuestión de tiempo --- lo señalamos como límite en la discusión ---, pero
+mantener la semilla fija entre ambos algoritmos elimina la principal fuente de
+variabilidad que nos interesaba controlar al comparar. No fue necesario ajustar
+ningún otro parámetro de tráfico o canal para esta comparación: el algoritmo
+propuesto convive en el mismo módulo que el kickstarter y sólo cambia la
+decisión de reenvío.
 
 \subsection{Resultados cuantitativos}
 
 \begin{table*}[!t]
   \centering
-  \caption{Comparación baseline vs.\ algoritmo propuesto (complete con sus datos).}
+  \caption{Comparación baseline (kickstarter) vs.\ algoritmo propuesto, mismo
+  tráfico/canales/semilla. En ``Caso 2 -- Paquetes entreg.'' reportamos el total
+  de paquetes recibidos en \texttt{node[5]} en 200\,s en lugar de pérdidas, ya
+  que el modelo no descarta paquetes (buffers ilimitados); en un escenario
+  saturado ese conteo es el indicador de desempeño más relevante.}
   \label{tab:comparacion}
   \begin{tabular}{@{}lrrrr@{}}
     \toprule
@@ -538,161 +616,31 @@ semillas 1--5; reportamos la media y el máximo de demora extremo a extremo.'']}
     \cmidrule(lr){2-3}\cmidrule(lr){4-5}
     & \textbf{Media} & \textbf{Máx.} & \textbf{Media} & \textbf{Máx.} \\
     \midrule
-    Caso 1 — Demora (s)     & 0.00 & 0.00 & 0.00 & 0.00 \\
-    Caso 1 — Saltos         & 0.0  & 0    & 0.0  & 0    \\
-    Caso 2 — Demora (s)     & 0.00 & 0.00 & 0.00 & 0.00 \\
-    Caso 2 — Pérdidas       & 0    & --   & 0    & --   \\
+    Caso 1 — Demora (s)        & 51.16 & 105.56 & 6.85  & 14.42  \\
+    Caso 1 — Saltos            & 3.92  & 5      & 3.00  & 3      \\
+    Caso 2 — Demora (s)        & 64.53 & 184.23 & 63.35 & 178.56 \\
+    Caso 2 — Paquetes entreg.  & 199   & --     & 398   & --     \\
     \bottomrule
   \end{tabular}
 \end{table*}
 
-\begin{figure}[!t]
-  \centering
-  \begin{tikzpicture}
-    \begin{axis}[
-      width=\linewidth,
-      height=4.5cm,
-      ybar,
-      bar width=10pt,
-      ymin=0,
-      symbolic x coords={Caso1-Demora,Caso1-Saltos,Caso2-Demora,Caso2-Buffer},
-      xtick=data,
-      x tick label style={font=\scriptsize, rotate=30, anchor=east},
-      ylabel={Valor},
-      legend style={font=\scriptsize, at={(0.5,1.02)}, anchor=south, legend columns=-1},
-      enlarge x limits=0.15,
-    ]
-      \addplot coordinates {
-        (Caso1-Demora,0.72) (Caso1-Saltos,4.0) (Caso2-Demora,1.85) (Caso2-Buffer,0.65)
-      };
-      \addplot coordinates {
-        (Caso1-Demora,0.41) (Caso1-Saltos,2.0) (Caso2-Demora,0.92) (Caso2-Buffer,0.28)
-      };
-      \legend{Kickstarter, Propuesto}
-    \end{axis}
-  \end{tikzpicture}
-  \caption{Ejemplo de barras agrupadas para comparar algoritmos. Todo
-  gráfico debe tener ejes etiquetados, unidades y leyenda.}
-  \label{fig:comparacion-barras}
-\end{figure}
-
-\subsection{Discusión de resultados}
-
-\guia{%
-  Interprete las tablas y figuras anteriores. Relacione mejoras con decisiones
-  concretas de su diseño (p.\,ej.\ balanceo de carga, ruta más corta). Mencione
-  mejoras posibles no implementadas por limitaciones de tiempo o alcance.
-}
-
-\textit{[Discusión basada en evidencia. ¿Se observaron bucles? ¿En qué
-condiciones? ¿Cómo los detectó o evitó?]}
-
-\section{Tarea estrella (opcional)}
-\label{sec:estrella}
-
-\guia{%
-  Si realizaron la tarea opcional, documente la generalización a topologías
-  arbitrarias y $N$ interfaces (p.\,ej.\ \texttt{networkStar}). Explique cómo
-  detectan interfaces activas y gates desconectadas. Incluya al menos un
-  experimento adicional con figura o tabla. Si no la realizaron, elimine esta
-  sección o indique brevemente por qué quedó fuera de alcance.
-}
-
-\textit{[Contenido opcional: topología estrella, desafíos de implementación,
-resultados comparativos con el anillo.]}
-
-\begin{figure}[!t]
-  \centering
-  \begin{tikzpicture}[scale=0.9, every node/.style={circle, draw, minimum size=5mm, font=\scriptsize}]
-    \node (c) at (0,0) {C};
-    \node (a) at (-1.5,1) {A};
-    \node (b) at (1.5,1) {B};
-    \node (d) at (-1.5,-1) {D};
-    \node (e) at (1.5,-1) {E};
-    \draw (c) -- (a) (c) -- (b) (c) -- (d) (c) -- (e);
-  \end{tikzpicture}
-  \caption{Ejemplo esquemático de topología estrella (\texttt{networkStar}).
-  Reemplace por su figura y describa cómo se adapta el algoritmo a $N$ interfaces.}
-  \label{fig:estrella}
-\end{figure}
-
-\appendix
-
-\section{Guía para tablas y gráficos con datos de OMNeT++}
-\label{ap:graficos}
-
-\guia{%
-  Este apéndice es \textbf{solo orientativo}: Les tiene que servir para saber
-  cómo pasar de la simulación a evidencia publicable. Pueden eliminarlo en 
-  la entrega final.
-}
-
-\subsection{Exportar resultados}
-
-\begin{enumerate}
-  \item Ejecute cada escenario con \textbf{semillas distintas} o repeticiones
-        suficientes si busca intervalos de confianza.
-  \item Exporte \textbf{escalares} (promedio, máximo, conteo) y \textbf{vectores}
-        (series temporales) desde el IDE o con \texttt{scavetool}.
-  \item Guarde los CSV en \texttt{figuras/datos/} y documente en el paper la
-        configuración (\texttt{omnetpp.ini}, tiempo de simulación, semilla).
-\end{enumerate}
-
-\guia{%
-  Ejemplo de flujo de trabajo: (1)~simular $\rightarrow$ (2)~exportar
-  \texttt{.sca} y \texttt{.vec} $\rightarrow$ (3)~procesar con script propio o
-  planilla $\rightarrow$ (4)~generar PDF/PNG $\rightarrow$ (5)~incluir con
-  \texttt{\textbackslash includegraphics}. Mantenga los scripts en el repositorio
-  junto al paper para reproducibilidad.
-}
-
-\subsection{Ejemplo de tabla de mejoras porcentuales}
-
-Cuando compare algoritmos, una tabla de mejoras complementa la Tab.~\ref{tab:comparacion}:
-
 \begin{table}[!ht]
   \centering
-  \caption{Mejora relativa del algoritmo propuesto vs.\ kickstarter (ejemplo).}
+  \caption{Mejora relativa del algoritmo propuesto vs.\ kickstarter, calculada
+  como $(\text{base}-\text{prop.})/\text{base}\times 100$ (invertida para
+  throughput, donde mayor es mejor).}
   \label{tab:mejoras}
   \coltablesetup
   \resizebox{\columnwidth}{!}{%
   \begin{tabular}{@{}lrr@{}}
     \toprule
-    \textbf{Métrica (escenario)} & \textbf{Base} & \textbf{Mej. (\%)} \\
+    \textbf{Métrica (escenario)} & \textbf{Base} & \textbf{Mej.} \\
     \midrule
-    Demora media (Caso 1) & 0.82\,s & $-43\%$ \\
-    Saltos promedio (Caso 1) & 4.0 & $-50\%$ \\
-    Demora media (Caso 2) & 1.85\,s & $-50\%$ \\
-    Ocup. máx.\ buffer (Caso 2) & 25 pkts & $-80\%$ \\
-    \bottomrule
-  \end{tabular}%
-  }
-\end{table}
-
-\guia{%
-  Calcule mejora como $(\mathrm{baseline} - \mathrm{propuesto}) / \mathrm{baseline}
-  \times 100$ para métricas donde \textbf{menor es mejor} (demora, saltos,
-  pérdidas). Para throughput, invierta la fórmula. Explique en el texto si un
-  $-43\%$ en demora es significativo en términos absolutos.
-}
-
-\subsection{Cuándo usar cada recurso gráfico}
-
-\begin{table}[!ht]
-  \centering
-  \caption{Recursos recomendados según el tipo de evidencia.}
-  \label{tab:recursos-graficos}
-  \coltablesetup
-  \resizebox{\columnwidth}{!}{%
-  \begin{tabular}{@{}p{0.28\columnwidth}p{0.30\columnwidth}p{0.34\columnwidth}@{}}
-    \toprule
-    \textbf{Objetivo} & \textbf{Recurso} & \textbf{Ejemplo} \\
-    \midrule
-    Comparar escenarios & Tabla + barras & Tab.~\ref{tab:comparacion} \\
-    Sensibilidad param. & Curva $x$ vs.\ métrica & Fig.~\ref{fig:caso2-estabilidad} \\
-    Evolución temporal & Serie de tiempo & Fig.~\ref{fig:buffer-tiempo} \\
-    Distrib. demoras & Histograma & \textit{[si aplica]} \\
-    Topología & Diagrama de red & Fig.~\ref{fig:topologia} \\
+    Demora media (Caso 1)        & 51.16\,s  & $-87\%$  \\
+    Saltos promedio (Caso 1)     & 3.92      & $-23\%$  \\
+    Ocup.\ máx.\ buffer (Caso 1) & 190\,pkts & $-91\%$  \\
+    Demora media (Caso 2)        & 64.53\,s  & $-2\%$   \\
+    Paquetes entregados (Caso 2) & 199       & $+100\%$ \\
     \bottomrule
   \end{tabular}%
   }
@@ -700,116 +648,154 @@ Cuando compare algoritmos, una tabla de mejoras complementa la Tab.~\ref{tab:com
 
 \begin{figure}[!t]
   \centering
-  \begin{tikzpicture}
-    \begin{axis}[
-      width=\linewidth,
-      height=4.2cm,
-      xlabel={Tiempo de simulación (s)},
-      ylabel={Ocupación buffer (pkts)},
-      xmin=0, xmax=100,
-      ymin=0,
-      grid=major,
-      legend style={font=\scriptsize},
-    ]
-      \addplot[thick, blue] coordinates {
-        (0,0)(10,2)(20,5)(30,8)(40,12)(50,15)(60,18)(70,20)(80,22)(90,24)(100,25)
-      };
-      \addlegendentry{Kickstarter}
-      \addplot[thick, orange] coordinates {
-        (0,0)(10,1)(20,2)(30,3)(40,4)(50,4)(60,5)(70,5)(80,5)(90,5)(100,5)
-      };
-      \addlegendentry{Propuesto}
-    \end{axis}
-  \end{tikzpicture}
-  \caption{Ejemplo de serie temporal: ocupación de buffer. Útil para mostrar
-  saturación o estabilidad en el Caso~2.}
+  \includegraphics[width=\linewidth]{figuras/fig-comparacion-mejoras.pdf}
+  \caption{Mejora porcentual del algoritmo propuesto frente al kickstarter
+  (datos de la Tabla~\ref{tab:mejoras}). Barras verdes: mejora; el valor
+  cercano a 0\% de ``Demora Caso 2'' se discute en el texto.}
+  \label{fig:comparacion-barras}
+\end{figure}
+
+\subsection{Discusión de resultados}
+
+\textbf{Caso 1 (escenario liviano, $\rho < 1$).} Las mejoras son grandes y
+consistentes en las cuatro métricas (Tabla~\ref{tab:mejoras},
+Fig.~\ref{fig:comparacion-barras}): la demora media cae 87\% (de 51.16\,s a
+6.85\,s), el conteo de saltos 23\% (de 3.92 a un valor \emph{constante} de 3,
+igual al óptimo) y la ocupación máxima del cuello de botella 91\% (de 190 a 18
+paquetes). Es exactamente lo esperable de elegir el camino más corto: al evitar
+el punto de fusión identificado en la Sección~\ref{sec:analisis}
+(Fig.~\ref{fig:caso1-demora}), cada flujo circula por su propio
+semianillo con carga ofrecida $\rho \approx 1$ en lugar de $\rho \approx 2$, y
+el sistema deja de estar saturado.
+
+\textbf{Caso 2 (escenario saturado, $\rho \gg 1$).} Acá conviene mirar con
+cuidado: la demora media \emph{casi no cambia} ($-2\%$, de 64.53\,s a
+63.35\,s). No es un fracaso del algoritmo, sino consecuencia directa de que a
+\texttt{interArrivalTime} = 1\,s \emph{ambas} redes siguen sobrecargadas ---
+ninguna alcanza régimen estacionario en 200\,s, y en saturación la demora está
+dominada por el tiempo de cola acumulado, que crece en los dos casos. La
+métrica que sí revela la mejora es el throughput sostenido: en la misma
+ventana, el algoritmo propuesto entregó 398 paquetes contra 199 del
+kickstarter --- exactamente el doble (Tabla~\ref{tab:comparacion}). La razón es
+estructural: el algoritmo propuesto reparte los siete flujos en las dos
+direcciones según la distancia real a \texttt{node[5]} (tres hacia el sentido
+horario --- \texttt{node[0]}, \texttt{node[6]}, \texttt{node[7]} --- y cuatro
+hacia el antihorario --- \texttt{node[1]} a \texttt{node[4]}, con
+\texttt{node[1]} resolviendo a favor de ese lado el empate que se ve en la
+Tabla~\ref{tab:rutas} ---), de modo que el cuello de botella más cargado pasa
+de concentrar los \emph{siete} flujos ($\rho \approx 7$) a concentrar a lo sumo
+\emph{cuatro} ($\rho \approx 4$). La Fig.~\ref{fig:caso2-estabilidad} muestra el
+efecto de ese cambio sobre el umbral de estabilidad: mientras el kickstarter
+necesita \texttt{interArrivalTime} $\gtrsim 7$\,s (Sección~\ref{sec:caso2}), el
+propuesto ya es estable desde $\approx 4$--$5$\,s --- justo donde $\rho =
+4/\texttt{interArrivalTime} \approx 1$ para su peor cuello de botella. La
+Fig.~\ref{fig:buffer-tiempo} lo ilustra de forma muy directa: a
+\texttt{interArrivalTime} = 5\,s, la cola de \texttt{node[6].lnk[0]} crece
+linealmente y sin pausa con el kickstarter, mientras que con el algoritmo
+propuesto fluctúa en forma acotada alrededor de un valor pequeño --- la
+diferencia entre una cola con $\rho > 1$ y una con $\rho < 1$, en una sola
+figura.
+
+\begin{figure}[!t]
+  \centering
+  \includegraphics[width=\linewidth]{figuras/fig-buffer-tiempo.pdf}
+  \caption{Ocupación de \texttt{node[6].lnk[0]} a lo largo de la simulación,
+  con \texttt{interArrivalTime} medio $=5$\,s (Caso~2): el kickstarter es
+  inestable en ese punto y el propuesto ya es estable.}
   \label{fig:buffer-tiempo}
 \end{figure}
 
-\subsection{Incluir figuras externas en \LaTeX}
+\textbf{¿Bucles de enrutamiento?} No observamos ninguno en ninguna corrida, y
+la razón es estructural y no estadística: la regla de reenvío de
+\texttt{HELLO} (``seguir por la interfaz opuesta a la de llegada, descartar al
+volver al origen'') hace que cada mensaje de descubrimiento recorra el anillo
+en un único sentido, sin posibilidad de ciclos; y la regla de reenvío de datos
+(``ir por la interfaz de la entrada con menor cantidad de saltos'') siempre
+mueve al paquete \emph{estrictamente más cerca} de su destino, porque en un
+anillo las distancias por cada sentido son monótonas y nunca puede convenir
+reenviar hacia un nodo que, a su vez, reenviaría de vuelta. Como verificación
+indirecta: el conteo de saltos máximo que registramos para tráfico de datos con
+el algoritmo propuesto, contando ambos escenarios, fue 4 (en el Caso 2; el
+Caso 1 fue constante e igual a 3, Tabla~\ref{tab:comparacion}) --- igual a la
+distancia máxima posible en un anillo de 8 nodos. Si hubiera bucles veríamos
+conteos mucho mayores, o paquetes que nunca llegan.
 
-Para gráficos generados con Python, R, Matplotlib o el IDE de OMNeT++:
+\textbf{¿Y con muchos más nodos?} El tamaño de la tabla de rutas crece
+linealmente con la cantidad de nodos $N$ (una entrada por destino), igual que
+en cualquier protocolo de vector de distancias, y el costo de la inundación de
+\texttt{HELLO} también es lineal en $N$ (cada paquete recorre el anillo una
+vez). Lo que cambiaría es la \emph{ventaja relativa}: cuantos más nodos tenga
+el anillo, mayor es la diferencia entre el camino más corto y el camino fijo
+por \texttt{lnk[0]} (en el peor caso el kickstarter recorre $N-1$ saltos donde
+el camino más corto recorre $N/2$), así que esperaríamos que la mejora en
+demora y saltos \emph{crezca} con $N$, no que se diluya. El algoritmo de la
+cátedra --- que entendemos apunta a generalizar a topologías arbitrarias ---
+probablemente escale mejor que el nuestro en redes que no son anillos, donde
+nuestra regla de terminación (``seguir por la interfaz opuesta'') deja de tener
+sentido.
 
-\begin{small}
-\begin{verbatim}
-\begin{figure}[!t]
-  \centering
-  \includegraphics[width=\linewidth]{figuras/mi-grafico.pdf}
-  \caption{Demora media por escenario.}
-  \label{fig:mi-grafico}
-\end{figure}
-\end{verbatim}
-\end{small}
-
-\guia{%
-  Prefiera PDF o PNG de alta resolución. En el texto, \textbf{siempre} referencie
-  la figura \textbf{antes} de que aparezca y explique qué se ve: no basta con
-  insertar el gráfico sin interpretación.
-}
-
-\section{Checklist de entrega del paper}
-\label{ap:checklist}
-
-\guia{%
-  Revise este listado antes de subir al repositorio. Borre el apéndice si ya no
-  lo necesita.
-}
-
-\begin{itemize}
-  \item Título, autores, \emph{abstract} e \emph{index terms} en inglés.
-  \item Cuerpo del artículo en español, sin cajas \texttt{\textbackslash guia\{\}}.
-  \item Respuestas explícitas a Caso~1, Caso~2 y evaluación comparativa.
-  \item Al menos \textbf{3 figuras} y \textbf{2 tablas} con datos propios
-        (no solo los ejemplos de la plantilla).
-  \item Cada conclusión respaldada por una tabla o figura citada.
-  \item Descripción del algoritmo, decisiones de diseño y detección de bucles.
-  \item Extensión final entre 6 y 8 páginas en formato de dos columnas.
-  \item Figuras con ejes, unidades, leyenda y caption descriptivo.
-  \item Bibliografía en formato consistente (IEEE-like o APA).
-\end{itemize}
-
-\subsection{Mapa entre tareas del laboratorio y secciones del paper}
-
-\begin{table}[!ht]
-  \centering
-  \caption{Correspondencia entre el enunciado y las secciones de este documento.}
-  \label{tab:mapa-enunciado}
-  \coltablesetup
-  \resizebox{\columnwidth}{!}{%
-  \begin{tabular}{@{}p{0.46\columnwidth}p{0.48\columnwidth}@{}}
-    \toprule
-    \textbf{Tarea / pregunta} & \textbf{Sección del paper} \\
-    \midrule
-    Instrumentar métricas & Sec.~\ref{sec:modelo}, Tab.~\ref{tab:metricas} \\
-    Caso 1: métricas y recursos & Sec.~\ref{sec:analisis}, Tab.~\ref{tab:caso1} \\
-    Caso 2: estabilidad & Sec.~\ref{sec:analisis}, Fig.~\ref{fig:caso2-estabilidad} \\
-    Diseño del algoritmo & Sec.~\ref{sec:diseno} \\
-    Comparación y bucles & Sec.~\ref{sec:evaluacion} \\
-    Tarea estrella (opcional) & Sec.~\ref{sec:estrella} \\
-    \bottomrule
-  \end{tabular}%
-  }
-\end{table}
+\textbf{¿Y si se cae un nodo?} Ninguno de los dos algoritmos lo tolera bien tal
+como están. El kickstarter no tiene forma de detectarlo: seguiría reenviando
+por \texttt{lnk[0]} hacia un enlace roto indefinidamente. El nuestro está
+mejor posicionado \emph{en principio} --- ya cuenta con un mecanismo periódico
+de descubrimiento (\texttt{helloInterval}) que, en teoría, podría notar que
+dejaron de llegar \texttt{HELLO} desde cierta dirección y purgar esas rutas ---
+pero en la implementación actual no lo hace: las entradas de
+\texttt{routingTable} no expiran, así que si la única ruta conocida hacia un
+destino deja de existir, el nodo seguiría enviando paquetes hacia un enlace
+caído para siempre. Agregar una marca de tiempo a cada entrada y descartar las
+que no se refrescaron en, digamos, $2\times\texttt{helloInterval}$ es una
+extensión natural y relativamente sencilla sobre la base que ya construimos,
+pero quedó fuera del alcance de este informe por una cuestión de tiempo.
 
 \section{Conclusiones}
 \label{sec:conclusiones}
 
-\guia{%
-  Sintetice en un párrafo los hallazgos del análisis (Sección~\ref{sec:analisis}),
-  las ventajas de su algoritmo (Sección~\ref{sec:evaluacion}) y aprendizajes
-  del laboratorio. Evite introducir datos nuevos; apóyese en lo ya mostrado.
-}
+El análisis del kickstarter (Sección~\ref{sec:analisis}) mostró que su regla
+fija ``siempre por \texttt{lnk[0]}'' concentra todo el tráfico en un mismo
+sentido del anillo: en el Caso~1 esto crea un punto de fusión con carga
+ofrecida $\rho \approx 2$ que casi duplica la demora del tráfico que lo
+atraviesa (Tabla~\ref{tab:caso1}, Fig.~\ref{fig:caso1-demora}), y en el Caso~2
+concentra los siete flujos en un único cuello de botella con $\rho \approx 7$,
+que se vuelve inestable a partir de \texttt{interArrivalTime} $\approx 7$\,s
+(Fig.~\ref{fig:caso2-estabilidad}). A partir de ese diagnóstico diseñamos un
+algoritmo de enrutamiento por camino más corto (Sección~\ref{sec:diseno}) que
+construye su tabla de rutas inundando paquetes \texttt{HELLO} --- la única vía
+permitida para descubrir la topología sin recorrer \texttt{cTopology} ni
+\texttt{cGate} --- y reenvía cada paquete de datos por la interfaz que minimiza
+la distancia conocida al destino. Activarlo con un solo parámetro
+(\texttt{useShortestPath}) sobre exactamente el mismo tráfico, canales y
+semilla nos permitió aislar el efecto de la decisión de enrutamiento: redujo la
+demora media del Caso~1 en 87\% y la ocupación máxima de buffers en 91\%
+(Tabla~\ref{tab:mejoras}), y en el Caso~2 --- donde ambas redes siguen
+saturadas y la demora deja de ser el indicador relevante --- duplicó el
+throughput sostenido (199 a 398 paquetes en 200\,s) y bajó el umbral de
+estabilidad de $\approx 7$\,s a $\approx 4$--$5$\,s
+(Fig.~\ref{fig:caso2-estabilidad}, Fig.~\ref{fig:buffer-tiempo}). No
+observamos bucles de enrutamiento en ninguna corrida, y pudimos justificarlo de
+forma estructural --- no sólo empírica --- a partir de las dos reglas de
+reenvío del algoritmo (Sección~\ref{sec:evaluacion}).
 
-\textit{[Conclusiones concisas y respaldadas por las figuras/tablas del paper.]}
-
-\textit{[Párrafo sugerido: ``En el análisis del kickstarter (Sección~\ref{sec:analisis})
-observamos [...] (Tab.~\ref{tab:caso1}, Fig.~\ref{fig:caso2-estabilidad}). Nuestro
-algoritmo (Sección~\ref{sec:diseno}) redujo la demora media en un X\% y evitó
-bucles mediante [...]. Como trabajo futuro proponemos [...].'']}
+Dicho esto, nuestra solución tiene límites que conviene dejar explícitos. Las
+dos reglas que la hacen simple y liviana --- terminar la inundación de
+\texttt{HELLO} por ``la interfaz opuesta'' y resolver activación de interfaces
+asumiendo grado~2 --- son específicas de un anillo, y no se trasladan
+directamente a topologías arbitrarias como \texttt{NetworkStar}.
+Tampoco maneja caídas de nodos: las entradas de
+\texttt{routingTable} no expiran, así que una ruta rota seguiría usándose para
+siempre. Como trabajo futuro proponemos, en ese orden de prioridad: (1)
+reemplazar la terminación ``por interfaz opuesta'' por inundación clásica con
+números de secuencia, lo que generaliza el descubrimiento a cualquier
+topología; y (2) agregar una marca de tiempo a cada ruta y descartar las que no
+se refrescan en $2\times\texttt{helloInterval}$, para tolerar fallas de
+enlaces y nodos sin rediseñar el resto del algoritmo.
 
 \section*{Agradecimientos}
 
-Opcional: reconocimientos a la cátedra, compañeros o herramientas.
+Agradecemos a la cátedra de Redes y Sistemas Distribuidos por el código base
+(kickstarter) y la guía de la consigna, que nos ahorraron buena parte del
+trabajo de modelado en OMNeT++ y nos dejaron concentrarnos en el diseño del
+algoritmo y en el análisis de los resultados.
 
 % Bibliografía mínima de ejemplo
 \begin{thebibliography}{99}
