@@ -12,6 +12,12 @@ simple App
 simple Net
 {
     parameters:
+        // false: kickstarter baseline (always forward through lnk[0]);
+        // true: proposed shortest-path routing learned via HELLO packets.
+        // Both live in the same module so the comparison runs share the
+        // exact same traffic, channels and random seed.
+        bool useShortestPath = default(false);
+        double helloInterval = default(20); // sec; how often to (re)flood discovery HELLOs (used only when useShortestPath = true)
         @display("i=block/dispatch");
     gates:
         inout toApp;
